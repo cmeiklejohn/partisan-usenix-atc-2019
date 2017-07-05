@@ -1,0 +1,11 @@
+{application,pc,
+             [{description,"a rebar3 port compiler for native code"},
+              {vsn,"1.6.0"},
+              {registered,[]},
+              {applications,[kernel,stdlib]},
+              {env,[]},
+              {modules,[pc,pc_compilation,pc_port_env,pc_port_specs,
+                        pc_prv_clean,pc_prv_compile,pc_util]},
+              {maintainers,["Brian L. Troutwine","Tristan Sloughter"]},
+              {licenses,["MIT"]},
+              {links,[{"Github","https://github.com/blt/port_compiler"}]}]}.

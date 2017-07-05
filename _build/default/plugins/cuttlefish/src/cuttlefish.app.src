@@ -1,0 +1,10 @@
+{application,cuttlefish,
+             [{description,"cuttlefish configuration abstraction"},
+              {vsn,"2.0.8"},
+              {registered,[]},
+              {applications,[kernel,stdlib]},
+              {env,[]},
+              {maintainers,[]},
+              {licenses,["Apache"]},
+              {links,[{"Github",
+                       "https://github.com/tsloughter/cuttlefish"}]}]}.
