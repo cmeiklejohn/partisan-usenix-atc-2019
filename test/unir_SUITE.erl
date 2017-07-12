@@ -164,6 +164,7 @@ start(_Case, Config, Options) ->
 
                             ok = rpc:call(Node, application, load, [partisan]),
                             ok = rpc:call(Node, application, load, [lager]),
+                            ok = rpc:call(Node, application, load, [riak_core]),
                             ok = rpc:call(Node, application, set_env, [sasl,
                                                                        sasl_error_logger,
                                                                        false]),
