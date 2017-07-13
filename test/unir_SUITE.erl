@@ -262,7 +262,6 @@ web_ports(Other) ->
 %% @private
 join_cluster(Nodes) ->
     %% Ensure each node owns 100% of it's own ring
-    [ct:pal("Owners: ~p", [owners_according_to(Node)]) || Node <- Nodes],
     [?assertEqual([Node], owners_according_to(Node)) || Node <- Nodes],
     %% Join nodes
     [Node1|OtherNodes] = Nodes,
@@ -383,8 +382,6 @@ wait_until_no_pending_changes(Nodes) ->
     F = fun() ->
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
-                [ct:pal("Pending changes: ~p",
-                        [riak_core_ring:pending_changes(Ring)]) || {ok, Ring} <- Rings],
                 Changes = [ riak_core_ring:pending_changes(Ring) =:= [] || {ok, Ring} <- Rings ],
                 BadNodes =:= [] andalso length(Changes) =:= length(Nodes) andalso lists:all(fun(T) -> T end, Changes)
         end,
@@ -430,7 +427,6 @@ wait_until(Node, Fun) when is_atom(Node), is_function(Fun) ->
 wait_until_owners_according_to(Node, Nodes) ->
   SortedNodes = lists:usort(Nodes),
   F = fun(N) ->
-      ct:pal("Owners: ~p, SortedNodes: ~p", [owners_according_to(N), SortedNodes]),
       owners_according_to(N) =:= SortedNodes
   end,
   ?assertEqual(ok, wait_until(Node, F)),
