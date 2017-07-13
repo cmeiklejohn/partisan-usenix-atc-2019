@@ -80,9 +80,26 @@ build_cluster_test(Config) ->
                   [{partisan_peer_service_manager,
                     partisan_default_peer_service_manager}]),
 
-    stop(Nodes),
+    SortedMembers = lists:usort([Node || {_Name, Node} <- Nodes]),
 
-    ct:fail(fail),
+    timer:sleep(5000),
+
+    lists:foreach(fun({_Name, Node}) ->
+                          case rpc:call(Node, partisan_peer_service, members, []) of
+                            {ok, Members} ->
+                                  ct:pal("Members for ~p: ~p", [Node, Members]),
+                                  case lists:usort(Members) =:= SortedMembers of
+                                      true ->
+                                          ok;
+                                      false ->
+                                          ct:fail(missing_members)
+                                  end;
+                            Error ->
+                                  ct:fail("Cannot retrieve membership: ~p", [Error])
+                          end
+                  end, Nodes),
+
+    stop(Nodes),
 
     ok.
 
