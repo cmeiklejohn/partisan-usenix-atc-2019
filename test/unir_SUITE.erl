@@ -130,13 +130,15 @@ start(_Case, Config, Options) ->
     {ok, _} = application:ensure_all_started(lager),
 
     %% Generate node names.
-    NodeNames = node_list(5, "unir", Config),
+    NodeNames = node_list(3, "unir", Config),
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
                             ct:pal("Starting node: ~p", [Name]),
 
                             NodeConfig = [{monitor_master, true},
+                                          {erl_flags, "-smp"}, %% smp for the eleveldb god
+
                                           {startup_functions,
                                            [{code, set_path, [codepath()]}]}],
 
@@ -174,15 +176,15 @@ start(_Case, Config, Options) ->
                             filelib:ensure_dir(PlatformDir),
                             filelib:ensure_dir(RingDir),
 
+                            ok = rpc:call(Node, application, set_env, [riak_core, cluster_name, "unir"]),
                             ok = rpc:call(Node, application, set_env, [riak_core, riak_state_dir, RingDir]),
                             ok = rpc:call(Node, application, set_env, [riak_core, ring_creation_size, NumberOfVNodes]),
 
                             ok = rpc:call(Node, application, set_env, [riak_core, platform_data_dir, PlatformDir]),
+                            ok = rpc:call(Node, application, set_env, [riak_core, handoff_ip, "127.0.0.1"]),
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_port, web_ports(Name) + 3]),
 
-                            ok = rpc:call(Node, application, set_env,
-                                          [riak_core, schema_dirs,
-                                           ["../../../../_build/default/rel/unir/share/schema/"]]),
+                            ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, ["../../../../_build/default/rel/unir/share/schema/"]]),
 
                             ok = rpc:call(Node, application, set_env, [riak_api, pb_port, web_ports(Name) + 2]),
                             ok = rpc:call(Node, application, set_env, [riak_api, pb_ip, "127.0.0.1"])
@@ -269,34 +271,48 @@ join_cluster(Nodes) ->
             %% no other nodes, nothing to join/plan/commit
             ok;
         _ ->
-            %% ok do a staged join and then commit it, this eliminates the
-            %% large amount of redundant handoff done in a sequential join
-            [staged_join(Node, Node1) || Node <- OtherNodes],
-            plan_and_commit(Node1),
-            try_nodes_ready(Nodes, 3, 500)
+            case length(Nodes) > 2 of
+                true ->
+                    %% ok do a staged join and then commit it, this eliminates the
+                    %% large amount of redundant handoff done in a sequential join
+                    [staged_join(Node, Node1) || Node <- OtherNodes],
+                    plan_and_commit(Node1),
+                    try_nodes_ready(Nodes, 3, 500);
+                false ->
+                    %% do the standard join.
+                    [join(Node, Node1) || Node <- OtherNodes]
+            end
     end,
 
     ?assertEqual(ok, wait_until_nodes_ready(Nodes)),
 
     %% Ensure each node owns a portion of the ring
-    wait_until_nodes_agree_about_ownership(Nodes),
+    ?assertEqual(ok, wait_until_nodes_agree_about_ownership(Nodes)),
     ?assertEqual(ok, wait_until_no_pending_changes(Nodes)),
-    wait_until_ring_converged(Nodes),
-    wait_until(hd(Nodes), fun wait_init:check_ready/1),
+    ?assertEqual(ok, wait_until_ring_converged(Nodes)),
+
     ok.
 
 %% @private
 owners_according_to(Node) ->
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
-            lager:info("Ring ~p", [Ring]),
+            % lager:info("Ring ~p", [Ring]),
             Owners = [Owner || {_Idx, Owner} <- riak_core_ring:all_owners(Ring)],
-            lager:info("Owners ~p", [lists:usort(Owners)]),
+            % lager:info("Owners ~p", [lists:usort(Owners)]),
             lists:usort(Owners);
         {badrpc, _}=BadRpc ->
             lager:info("Badrpc"),
             BadRpc
     end.
+
+%% @private
+join(Node, PNode) ->
+    timer:sleep(5000),
+    R = rpc:call(Node, riak_core, join, [PNode]),
+    lager:info("[join] ~p to (~p): ~p", [Node, PNode, R]),
+    ?assertEqual(ok, R),
+    ok.
 
 %% @private
 staged_join(Node, PNode) ->
@@ -316,7 +332,8 @@ plan_and_commit(Node) ->
             timer:sleep(5000),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
-        {ok, _, _} ->
+        {ok, Actions, _RingTransitions} ->
+            ct:pal("Actions for ring transition: ~p", [Actions]),
             do_commit(Node)
     end.
 
@@ -336,6 +353,7 @@ do_commit(Node) ->
             do_commit(Node);
         {error, nothing_planned} ->
             %% Assume plan actually committed somehow
+            ct:fail("Nothing planned!"),
             ok;
         ok ->
             ok
@@ -365,6 +383,8 @@ wait_until_no_pending_changes(Nodes) ->
     F = fun() ->
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
+                [ct:pal("Pending changes: ~p",
+                        [riak_core_ring:pending_changes(Ring)]) || {ok, Ring} <- Rings],
                 Changes = [ riak_core_ring:pending_changes(Ring) =:= [] || {ok, Ring} <- Rings ],
                 BadNodes =:= [] andalso length(Changes) =:= length(Nodes) andalso lists:all(fun(T) -> T end, Changes)
         end,
