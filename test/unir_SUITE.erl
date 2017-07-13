@@ -226,7 +226,12 @@ start(_Case, Config, Options) ->
                                 ct:pal("Riak Core failed to start: ~p",
                                        [Error]),
                                 ct:fail(riak_core_failure)
-                        end
+                        end,
+
+                        %% Start unir.
+                        {ok, _}  = rpc:call(Node,
+                                            application, ensure_all_started,
+                                            [unir])
                end,
     lists:foreach(StartFun, Nodes),
 
