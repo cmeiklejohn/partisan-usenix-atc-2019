@@ -1,5 +1,5 @@
 {"1.1.0",
-[{<<"acceptor_pool">>,{pkg,<<"acceptor_pool">>,<<"1.0.0-rc.0">>},2},
+[{<<"acceptor_pool">>,{pkg,<<"acceptor_pool">>,<<"1.0.0-rc.0">>},1},
  {<<"basho_stats">>,{pkg,<<"basho_stats">>,<<"1.0.3">>},1},
  {<<"bear">>,
   {git,"git://github.com/basho/bear.git",
@@ -51,18 +51,18 @@
        {ref,"a210adafdfbb904d156d8f22abd5fb58fc17de1e"}},
   1},
  {<<"partisan">>,
-  {git,"https://github.com/lasp-lang/partisan",
-       {ref,"010e706af9e9a24257aafd4cb912b3489056c8ed"}},
-  1},
+  {git,"git://github.com/lasp-lang/partisan",
+       {ref,"32602729826656385ee60daccaed5aae51a99992"}},
+  0},
  {<<"pbkdf2">>,
   {git,"git://github.com/marianoguerra/erlang-pbkdf2-no-history",
        {ref,"b8561cf72b13497ee498ce00bb80e5f2d24f512f"}},
   0},
  {<<"poolboy">>,{pkg,<<"basho_poolboy">>,<<"0.8.2">>},1},
- {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.1">>},2},
+ {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.1">>},1},
  {<<"riak_core">>,
   {git,"git://github.com/lasp-lang/riak_core",
-       {ref,"8c970f20cf702bce3ee9ac768c4913ab3358c33b"}},
+       {ref,"8467debe53d24c1f105b28e14d4773d3809939f0"}},
   0},
  {<<"riak_ensemble">>,
   {git,"git://github.com/Kyorai/riak_ensemble",
@@ -73,8 +73,8 @@
   {git,"git://github.com/basho/setup.git",
        {ref,"4878261b8859909569509ad67f6efefb735651f0"}},
   1},
- {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},2},
- {<<"types">>,{pkg,<<"types">>,<<"0.0.4">>},2}]}.
+ {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},1},
+ {<<"types">>,{pkg,<<"types">>,<<"0.1.6">>},1}]}.
 [
 {pkg_hash,[
  {<<"acceptor_pool">>, <<"679D741DF87FC13599B1AEF2DF8F78F1F880449A6BEFAB7C44FB6FAE0E92A2DE">>},
@@ -88,5 +88,5 @@
  {<<"rand_compat">>, <<"624B590931D27252D0BCF710211699DB3695540706F57D2E91B918A17AB58839">>},
  {<<"riak_sysmon">>, <<"2331BBCAEBE73EA7B2449F4C765827142476CC73D7D86999B4209EE005694D6B">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
- {<<"types">>, <<"B2BC2D58F12D85EFD06BC3A28B3DDE3C5AEF29EFB0FEE71FC2F1B6968C5E0DC1">>}]}
+ {<<"types">>, <<"03BB7140016C896D3441A77CB0B7D6ACAA583D6D6E9C4A3E1FD3C25123710290">>}]}
 ].
