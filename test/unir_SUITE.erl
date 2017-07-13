@@ -203,7 +203,7 @@ start(_Case, Config, Options) ->
                           [max_active_size, MaxActiveSize]),
 
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
-            ok = rpc:call(Node, partisan_config, set, [parallelism, ?config(parallelism, Config)])
+            ok = rpc:call(Node, partisan_config, set, [parallelism, 5])
     end,
     lists:foreach(ConfigureFun, Nodes),
 
