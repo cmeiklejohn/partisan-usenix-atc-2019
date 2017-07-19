@@ -147,7 +147,7 @@ start(_Case, Config, Options) ->
     {ok, _} = application:ensure_all_started(lager),
 
     %% Generate node names.
-    NodeNames = node_list(3, "unir", Config),
+    NodeNames = node_list(3, "node", Config),
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
@@ -268,15 +268,15 @@ node_list(N, Name, _Config) ->
         X <- lists:seq(1, N) ].
 
 %% @private
-web_ports(unir_1) ->
+web_ports(node_1) ->
     10015;
-web_ports(unir_2) ->
+web_ports(node_2) ->
     10025;
-web_ports(unir_3) ->
+web_ports(node_3) ->
     10035;
-web_ports(unir_4) ->
+web_ports(node_4) ->
     10045;
-web_ports(unir_5) ->
+web_ports(node_5) ->
     10055;
 web_ports(Other) ->
     ct:fail(Other).
