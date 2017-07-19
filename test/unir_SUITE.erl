@@ -55,11 +55,21 @@ end_per_suite(_Config) ->
 
 init_per_testcase(Case, Config) ->
     ct:pal("Beginning test case ~p", [Case]),
-    [{hash, erlang:phash2({Case, Config})}|Config].
 
-end_per_testcase(Case, _Config) ->
+    Nodes = start(Case,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    [{nodes, Nodes}, {hash, erlang:phash2({Case, Config})}|Config].
+
+end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
-    _Config.
+
+    Nodes = proplists:get_value(nodes, Config),
+    stop(Nodes),
+
+    Config.
 
 init_per_group(_, Config) ->
     Config.
@@ -68,22 +78,51 @@ end_per_group(_, _Config) ->
     ok.
 
 all() ->
-    [build_cluster_test].
+    [
+     membership_test,
+     metadata_test
+    ].
 
 %% ===================================================================
 %% Tests.
 %% ===================================================================
 
-build_cluster_test(Config) ->
-    Nodes = start(build_cluster_test,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
+metadata_test(Config) ->
+    [{_Name, Node}|_] = Nodes = proplists:get_value(nodes, Config),
+
+    Prefix = {unir, test},
+    Key = key,
+    Value = value,
+
+    case rpc:call(Node, riak_core_metadata, put, [Prefix, Key, Value]) of
+        ok ->
+            ok;
+        PutError ->
+            ct:fail("~p", [PutError])
+    end,
+
+    timer:sleep(10000),
+
+    lists:foreach(fun({_, OtherNode}) ->
+                          case rpc:call(OtherNode, riak_core_metadata, get, [Prefix, Key]) of
+                              Value ->
+                                  ok;
+                              GetError ->
+                                  ct:fail("~p", [GetError])
+                          end
+                  end,  Nodes),
+
+    ok.
+
+membership_test(Config) ->
+    Nodes = proplists:get_value(nodes, Config),
 
     SortedMembers = lists:usort([Node || {_Name, Node} <- Nodes]),
 
-    timer:sleep(5000),
+    timer:sleep(10000),
 
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
     lists:foreach(fun({_Name, Node}) ->
                           case rpc:call(Node, partisan_peer_service, members, []) of
                             {ok, Members} ->
@@ -283,6 +322,7 @@ web_ports(Other) ->
 join_cluster(Nodes) ->
     %% Ensure each node owns 100% of it's own ring
     [?assertEqual([Node], owners_according_to(Node)) || Node <- Nodes],
+
     %% Join nodes
     [Node1|OtherNodes] = Nodes,
     case OtherNodes of
