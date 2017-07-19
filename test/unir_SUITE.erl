@@ -346,21 +346,21 @@ staged_join(Node, PNode) ->
 %% @private
 plan_and_commit(Node) ->
     timer:sleep(5000),
-    lager:info("planning and committing cluster join"),
+    % lager:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
             lager:info("plan: ring not ready"),
             timer:sleep(5000),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
-        {ok, Actions, _RingTransitions} ->
-            ct:pal("Actions for ring transition: ~p", [Actions]),
+        {ok, _Actions, _RingTransitions} ->
+            % ct:pal("Actions for ring transition: ~p", [Actions]),
             do_commit(Node)
     end.
 
 %% @private
 do_commit(Node) ->
-    lager:info("Committing"),
+    % lager:info("Committing"),
     case rpc:call(Node, riak_core_claimant, commit, []) of
         {error, plan_changed} ->
             lager:info("commit: plan changed"),
@@ -400,7 +400,7 @@ maybe_wait_for_changes(Node) ->
 
 %% @private
 wait_until_no_pending_changes(Nodes) ->
-    lager:info("Wait until no pending changes on ~p", [Nodes]),
+    % lager:info("Wait until no pending changes on ~p", [Nodes]),
     F = fun() ->
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
@@ -419,7 +419,7 @@ wait_until(Fun) when is_function(Fun) ->
 
 %% @private
 wait_until_nodes_ready(Nodes) ->
-    lager:info("Wait until nodes are ready : ~p", [Nodes]),
+    % lager:info("Wait until nodes are ready : ~p", [Nodes]),
     [?assertEqual(ok, wait_until(Node, fun is_ready/1)) || Node <- Nodes],
     ok.
 
@@ -437,7 +437,7 @@ is_ready(Node) ->
 
 %% @private
 wait_until_nodes_agree_about_ownership(Nodes) ->
-    lager:info("Wait until nodes agree about ownership ~p", [Nodes]),
+    % lager:info("Wait until nodes agree about ownership ~p", [Nodes]),
     Results = [ wait_until_owners_according_to(Node, Nodes) || Node <- Nodes ],
     ?assert(lists:all(fun(X) -> ok =:= X end, Results)).
 
@@ -465,7 +465,7 @@ is_ring_ready(Node) ->
 
 %% @private
 wait_until_ring_converged(Nodes) ->
-    lager:info("Wait until ring converged on ~p", [Nodes]),
+    % lager:info("Wait until ring converged on ~p", [Nodes]),
     [?assertEqual(ok, wait_until(Node, fun is_ring_ready/1)) || Node <- Nodes],
     ok.
 
