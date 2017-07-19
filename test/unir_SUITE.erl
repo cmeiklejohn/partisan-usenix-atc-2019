@@ -39,7 +39,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(APP, partisan).
+-define(APP, unir).
 -define(CLIENT_NUMBER, 3).
 -define(PEER_PORT, 9000).
 
@@ -246,7 +246,7 @@ start(_Case, Config, Options) ->
                         %% Start unir.
                         {ok, _}  = rpc:call(Node,
                                             application, ensure_all_started,
-                                            [unir])
+                                            [?APP])
                end,
     lists:foreach(StartFun, Nodes),
 
