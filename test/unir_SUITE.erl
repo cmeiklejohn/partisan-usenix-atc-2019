@@ -227,6 +227,15 @@ start(_Case, Config, Options) ->
                             PlatformDir = NodeDir ++ "/data/",
                             RingDir = PlatformDir ++ "/ring/",
                             NumberOfVNodes = 4,
+
+                            %% Eagerly create incase it doesn't exist
+                            %% and delete to remove any state that
+                            %% remains between test executions.
+                            filelib:ensure_dir(PlatformDir),
+                            del_dir(PlatformDir),
+
+                            %% Recreate directories before starting
+                            %% Riak Core.
                             filelib:ensure_dir(PlatformDir),
                             filelib:ensure_dir(RingDir),
 
@@ -523,3 +532,28 @@ wait_until_result(Fun, Result, Retry, Delay) when Retry > 0 ->
             timer:sleep(Delay),
             wait_until_result(Fun, Result, Retry-1, Delay)
     end.
+
+%% @private
+del_dir(Dir) ->
+   lists:foreach(fun(D) ->
+                    ok = file:del_dir(D)
+                 end, del_all_files([Dir], [])).
+
+%% @private
+del_all_files([], EmptyDirs) ->
+   EmptyDirs;
+del_all_files([Dir | T], EmptyDirs) ->
+   {ok, FilesInDir} = file:list_dir(Dir),
+   {Files, Dirs} = lists:foldl(fun(F, {Fs, Ds}) ->
+                                  Path = Dir ++ "/" ++ F,
+                                  case filelib:is_dir(Path) of
+                                     true ->
+                                          {Fs, [Path | Ds]};
+                                     false ->
+                                          {[Path | Fs], Ds}
+                                  end
+                               end, {[],[]}, FilesInDir),
+   lists:foreach(fun(F) ->
+                         ok = file:delete(F)
+                 end, Files),
+   del_all_files(T ++ Dirs, [Dir | EmptyDirs]).
