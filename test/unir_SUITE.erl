@@ -99,8 +99,6 @@ build_cluster_test(Config) ->
                           end
                   end, Nodes),
 
-    stop(Nodes),
-
     ok.
 
 %% ===================================================================
