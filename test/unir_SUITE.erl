@@ -314,18 +314,10 @@ node_list(N, Name, _Config) ->
         X <- lists:seq(1, N) ].
 
 %% @private
-web_ports(node_1) ->
-    10015;
-web_ports(node_2) ->
-    10025;
-web_ports(node_3) ->
-    10035;
-web_ports(node_4) ->
-    10045;
-web_ports(node_5) ->
-    10055;
-web_ports(Other) ->
-    ct:fail(Other).
+web_ports(Name) ->
+    NameList = atom_to_list(Name),
+    [_|[Number]] = string:tokens(NameList, "_"),
+    10005 + (list_to_integer(Number) * 10).
 
 %% @private
 join_cluster(Nodes) ->
