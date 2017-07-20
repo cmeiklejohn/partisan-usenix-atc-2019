@@ -434,8 +434,9 @@ do_commit(Node) ->
 try_nodes_ready([Node1 | _Nodes], 0, _SleepMs) ->
       lager:info("Nodes not ready after initial plan/commit, retrying"),
       plan_and_commit(Node1);
-  try_nodes_ready(Nodes, N, SleepMs) ->
+try_nodes_ready(Nodes, N, SleepMs) ->
       ReadyNodes = [Node || Node <- Nodes, is_ready(Node) =:= true],
+
       case ReadyNodes of
           Nodes ->
               ok;
@@ -478,8 +479,10 @@ is_ready(Node) ->
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
             case lists:member(Node, riak_core_ring:ready_members(Ring)) of
-                true -> true;
-                false -> {not_ready, Node}
+                true ->
+                    true;
+                false ->
+                    {not_ready, Node}
             end;
         Other ->
             Other
