@@ -126,7 +126,6 @@ membership_test(Config) ->
     lists:foreach(fun({_Name, Node}) ->
                           case rpc:call(Node, partisan_peer_service, members, []) of
                             {ok, Members} ->
-                                  ct:pal("Members for ~p: ~p", [Node, Members]),
                                   case lists:usort(Members) =:= SortedMembers of
                                       true ->
                                           ok;
@@ -222,7 +221,7 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, load, [riak_core]),
                             ok = rpc:call(Node, application, set_env, [lager, log_root, NodeDir]),
 
-                            ct:print("Node dir: ~p", [NodeDir]),
+                            % ct:print("Node dir: ~p", [NodeDir]),
 
                             PlatformDir = NodeDir ++ "/data/",
                             RingDir = PlatformDir ++ "/ring/",
