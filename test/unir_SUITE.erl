@@ -119,7 +119,7 @@ membership_test(Config) ->
 
     SortedMembers = lists:usort([Node || {_Name, Node} <- Nodes]),
 
-    timer:sleep(10000),
+    timer:sleep(20000),
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
