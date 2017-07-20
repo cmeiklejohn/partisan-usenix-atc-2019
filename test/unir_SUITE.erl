@@ -94,6 +94,7 @@ metadata_test(Config) ->
     Key = key,
     Value = value,
 
+    %% Put a value into the metadata system.
     case rpc:call(Node, riak_core_metadata, put, [Prefix, Key, Value]) of
         ok ->
             ok;
@@ -101,8 +102,9 @@ metadata_test(Config) ->
             ct:fail("~p", [PutError])
     end,
 
-    timer:sleep(10000),
+    timer:sleep(20000),
 
+    %% Verify that we can read that value at all nodes.
     lists:foreach(fun({_, OtherNode}) ->
                           case rpc:call(OtherNode, riak_core_metadata, get, [Prefix, Key]) of
                               Value ->
