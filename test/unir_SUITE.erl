@@ -137,6 +137,16 @@ membership_test(Config) ->
                           end
                   end, Nodes),
 
+    %% Ensure we have the right number of connections.
+    lists:foreach(fun({_Name, Node}) ->
+                          case rpc:call(Node, partisan_peer_service, connections, []) of
+                            {ok, Connections} ->
+                                  verify_connections(Node, SortedMembers, Connections);
+                            Error ->
+                                  ct:fail("Cannot retrieve connections: ~p", [Error])
+                          end
+                  end, Nodes),
+
     ok.
 
 %% ===================================================================
@@ -548,3 +558,29 @@ del_all_files([Dir | T], EmptyDirs) ->
                          ok = file:delete(F)
                  end, Files),
    del_all_files(T ++ Dirs, [Dir | EmptyDirs]).
+
+%% @private
+verify_connections(Me, Others, Connections) ->
+    %% Verify we have connections to the peers we should have.
+    lists:foreach(fun(Other) ->
+                        case dict:find(Other, Connections) of
+                            {ok, Active} ->
+                                case length(Active) of
+                                    5 ->
+                                        ok;
+                                    OtherNumber ->
+                                        ct:fail("Incorrect number (~p) of connections for peer ~p at peer ~p",
+                                                [OtherNumber, Other, Me])
+                                end;
+                            error ->
+                                ct:fail("No entry for peer ~p at peer ~p.", [Other, Me])
+                        end
+                  end, Others -- [Me]),
+
+    %% Verify we don't have connetions to ourself.
+    case dict:find(Me, Connections) of
+        {ok, Active} ->
+            ct:fail("~p active connections to ourself!", [length(Active)]);
+        error ->
+            ok
+    end.
