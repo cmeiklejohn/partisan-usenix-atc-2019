@@ -70,12 +70,91 @@ end_per_group(_, _Config) ->
 all() ->
     [
      membership_test,
-     metadata_test
+     metadata_test,
+     transition_test
     ].
 
 %% ===================================================================
 %% Tests.
 %% ===================================================================
+
+transition_test(Config) ->
+    Nodes = start(transition_test,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager},
+                   {num_nodes, 4},
+                   {cluster_nodes, false}]),
+
+    %% Get the list of nodes.
+    [{_, Node1}, {_, Node2}, {_, Node3}, {_, Node4}] = Nodes,
+
+    %% Cluster the first two ndoes.
+    ok = join_cluster([Node1, Node2]),
+
+    %% Ensure we have the right number of connections.
+    lists:foreach(fun(Node) ->
+                          case rpc:call(Node, partisan_peer_service, connections, []) of
+                            {ok, Connections} ->
+                                  verify_connections(Node, [Node1, Node2], Connections);
+                            Error ->
+                                  ct:fail("Cannot retrieve connections: ~p", [Error])
+                          end
+                  end, [Node1, Node2]),
+
+    %% Put a value into the metadata system.
+    Prefix = {unir, test},
+    Key = key,
+    Value = value,
+
+    case rpc:call(Node1, riak_core_metadata, put, [Prefix, Key, Value]) of
+        ok ->
+            ok;
+        PutError ->
+            ct:fail("~p", [PutError])
+    end,
+
+    %% Join the third node.
+    staged_join(Node3, Node1),
+    plan_and_commit(Node1),
+
+    %% Ensure we have the right number of connections.
+    lists:foreach(fun(Node) ->
+                          case rpc:call(Node, partisan_peer_service, connections, []) of
+                            {ok, Connections} ->
+                                  verify_connections(Node, [Node1, Node2, Node3], Connections);
+                            Error ->
+                                  ct:fail("Cannot retrieve connections: ~p", [Error])
+                          end
+                  end, [Node1, Node2, Node3]),
+
+    %% Join the fourth node.
+    staged_join(Node4, Node1),
+    plan_and_commit(Node1),
+
+    %% Ensure we have the right number of connections.
+    lists:foreach(fun(Node) ->
+                          case rpc:call(Node, partisan_peer_service, connections, []) of
+                            {ok, Connections} ->
+                                  verify_connections(Node, [Node1, Node2, Node3, Node4], Connections);
+                            Error ->
+                                  ct:fail("Cannot retrieve connections: ~p", [Error])
+                          end
+                  end, [Node1, Node2, Node3, Node4]),
+
+    %% Verify that we can read that value at all nodes.
+    lists:foreach(fun({_, OtherNode}) ->
+                          case rpc:call(OtherNode, riak_core_metadata, get, [Prefix, Key]) of
+                              Value ->
+                                  ok;
+                              GetError ->
+                                  ct:fail("~p", [GetError])
+                          end
+                  end,  Nodes),
+
+    stop(Nodes),
+
+    ok.
 
 metadata_test(Config) ->
     Nodes = start(metadata_test,
