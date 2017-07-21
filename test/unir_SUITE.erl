@@ -55,20 +55,10 @@ end_per_suite(_Config) ->
 
 init_per_testcase(Case, Config) ->
     ct:pal("Beginning test case ~p", [Case]),
-
-    Nodes = start(Case,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    [{nodes, Nodes}, {hash, erlang:phash2({Case, Config})}|Config].
+    [{hash, erlang:phash2({Case, Config})}|Config].
 
 end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
-
-    Nodes = proplists:get_value(nodes, Config),
-    stop(Nodes),
-
     Config.
 
 init_per_group(_, Config) ->
@@ -117,7 +107,10 @@ metadata_test(Config) ->
     ok.
 
 membership_test(Config) ->
-    Nodes = proplists:get_value(nodes, Config),
+    Nodes = start(membership_test,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
 
     SortedMembers = lists:usort([Node || {_Name, Node} <- Nodes]),
 
@@ -148,6 +141,8 @@ membership_test(Config) ->
                                   ct:fail("Cannot retrieve connections: ~p", [Error])
                           end
                   end, Nodes),
+
+    stop(Nodes),
 
     ok.
 
@@ -195,7 +190,8 @@ start(_Case, Config, Options) ->
     {ok, _} = application:ensure_all_started(lager),
 
     %% Generate node names.
-    NodeNames = node_list(3, "node", Config),
+    NumNodes = proplists:get_value(num_nodes, Options, 3),
+    NodeNames = node_list(NumNodes, "node", Config),
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
@@ -309,8 +305,15 @@ start(_Case, Config, Options) ->
                end,
     lists:foreach(StartFun, Nodes),
 
-    ct:pal("Clustering nodes."),
-    join_cluster([Node || {_Name, Node} <- Nodes]),
+    %% Determine if we should cluster the nodes or not.
+    ClusterNodes = proplists:get_value(cluster_nodes, Options, true),
+    case ClusterNodes of
+        true ->
+            ct:pal("Clustering nodes."),
+            ok = join_cluster([Node || {_Name, Node} <- Nodes]);
+        false ->
+            ct:pal("Skipping cluster formation.")
+    end,
 
     ct:pal("Nodes fully initialized: ~p", [Nodes]),
 
