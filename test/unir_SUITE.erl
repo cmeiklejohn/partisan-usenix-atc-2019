@@ -42,6 +42,7 @@
 -define(APP, unir).
 -define(CLIENT_NUMBER, 3).
 -define(PEER_PORT, 9000).
+-define(SLEEP, 30000).
 
 %% ===================================================================
 %% common_test callbacks
@@ -92,6 +93,8 @@ transition_test(Config) ->
     %% Cluster the first two ndoes.
     ok = join_cluster([Node1, Node2]),
 
+    timer:sleep(?SLEEP),
+
     %% Ensure we have the right number of connections.
     lists:foreach(fun(Node) ->
                           case rpc:call(Node, partisan_peer_service, connections, []) of
@@ -118,6 +121,8 @@ transition_test(Config) ->
     staged_join(Node3, Node1),
     plan_and_commit(Node1),
 
+    timer:sleep(?SLEEP),
+
     %% Ensure we have the right number of connections.
     lists:foreach(fun(Node) ->
                           case rpc:call(Node, partisan_peer_service, connections, []) of
@@ -131,6 +136,8 @@ transition_test(Config) ->
     %% Join the fourth node.
     staged_join(Node4, Node1),
     plan_and_commit(Node1),
+
+    timer:sleep(?SLEEP),
 
     %% Ensure we have the right number of connections.
     lists:foreach(fun(Node) ->
@@ -177,7 +184,7 @@ metadata_test(Config) ->
             ct:fail("~p", [PutError])
     end,
 
-    timer:sleep(20000),
+    timer:sleep(?SLEEP),
 
     %% Verify that we can read that value at all nodes.
     lists:foreach(fun({_, OtherNode}) ->
@@ -201,7 +208,7 @@ membership_test(Config) ->
 
     SortedMembers = lists:usort([Node || {_Name, Node} <- Nodes]),
 
-    timer:sleep(20000),
+    timer:sleep(?SLEEP),
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
@@ -489,7 +496,7 @@ plan_and_commit(Node) ->
     % lager:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
-            lager:info("plan: ring not ready"),
+            ct:pal("plan: ring not ready"),
             timer:sleep(5000),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
