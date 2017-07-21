@@ -78,7 +78,13 @@ all() ->
 %% ===================================================================
 
 metadata_test(Config) ->
-    [{_Name, Node}|_] = Nodes = proplists:get_value(nodes, Config),
+    Nodes = start(metadata_test,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    %% Get the first node.
+    [{_Name, Node}|_] = Nodes,
 
     Prefix = {unir, test},
     Key = key,
@@ -103,6 +109,8 @@ metadata_test(Config) ->
                                   ct:fail("~p", [GetError])
                           end
                   end,  Nodes),
+
+    stop(Nodes),
 
     ok.
 
