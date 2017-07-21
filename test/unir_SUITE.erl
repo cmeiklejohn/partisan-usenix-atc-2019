@@ -458,7 +458,12 @@ join_cluster(Nodes) ->
                     %% ok do a staged join and then commit it, this eliminates the
                     %% large amount of redundant handoff done in a sequential join
                     [staged_join(Node, Node1) || Node <- OtherNodes],
+
+                    %% Sleep for partisan connections to be setup.
+                    timer:sleep(?SLEEP),
+
                     plan_and_commit(Node1),
+
                     try_nodes_ready(Nodes, 3, 500);
                 false ->
                     %% do the standard join.
