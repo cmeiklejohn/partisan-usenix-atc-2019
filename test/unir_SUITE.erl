@@ -119,6 +119,13 @@ transition_test(Config) ->
 
     %% Join the third node.
     staged_join(Node3, Node1),
+
+    %% Sleep is required for partisan to setup the TCP connections
+    %% necessary for the information to reach the ring and be available
+    %% for the commit.
+    timer:sleep(?SLEEP),
+
+    %% Plan will only succeed once the ring has been gossiped.
     plan_and_commit(Node1),
 
     timer:sleep(?SLEEP),
@@ -135,6 +142,13 @@ transition_test(Config) ->
 
     %% Join the fourth node.
     staged_join(Node4, Node1),
+
+    %% Sleep is required for partisan to setup the TCP connections
+    %% necessary for the information to reach the ring and be available
+    %% for the commit.
+    timer:sleep(?SLEEP),
+
+    %% Plan will only succeed once the ring has been gossiped.
     plan_and_commit(Node1),
 
     timer:sleep(?SLEEP),
