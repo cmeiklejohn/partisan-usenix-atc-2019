@@ -45,6 +45,9 @@
 -define(SLEEP, 30000).
 -define(PARALLELISM, 5).
 
+-define(PREFIX, {unir, test}).
+-define(KEY, key).
+-define(VALUE, value).
 
 %% ===================================================================
 %% common_test callbacks
@@ -158,32 +161,21 @@ metadata_test(Config) ->
                   [{partisan_peer_service_manager,
                     partisan_default_peer_service_manager}]),
 
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
     %% Get the first node.
     [{_Name, Node}|_] = Nodes,
 
-    Prefix = {unir, test},
-    Key = key,
-    Value = value,
-
     %% Put a value into the metadata system.
-    case rpc:call(Node, riak_core_metadata, put, [Prefix, Key, Value]) of
+    case rpc:call(Node, riak_core_metadata, put, [?PREFIX, ?KEY, ?VALUE]) of
         ok ->
             ok;
         PutError ->
             ct:fail("~p", [PutError])
     end,
 
-    timer:sleep(?SLEEP),
-
     %% Verify that we can read that value at all nodes.
-    lists:foreach(fun({_, OtherNode}) ->
-                          case rpc:call(OtherNode, riak_core_metadata, get, [Prefix, Key]) of
-                              Value ->
-                                  ok;
-                              GetError ->
-                                  ct:fail("~p", [GetError])
-                          end
-                  end,  Nodes),
+    ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
 
     stop(Nodes),
 
@@ -713,3 +705,22 @@ wait_until_partisan_membership(Nodes) ->
                 verify_partisan_membership(Nodes)
         end,
     wait_until(F).
+
+wait_until_metadata_read(Nodes) ->
+    F = fun() ->
+                verify_metadata_read(Nodes)
+        end,
+    wait_until(F).
+
+verify_metadata_read(Nodes) ->
+    %% Verify that we can read that value at all nodes.
+    R = lists:map(fun(Node) ->
+                          case rpc:call(Node, riak_core_metadata, get, [?PREFIX, ?KEY]) of
+                              ?VALUE ->
+                                  true;
+                              _ ->
+                                  false
+                          end
+                  end,  Nodes),
+
+    lists:all(fun(X) -> X =:= true end, R).
