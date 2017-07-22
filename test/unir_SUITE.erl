@@ -199,19 +199,6 @@ membership_test(Config) ->
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
-    lists:foreach(fun({_Name, Node}) ->
-                          case rpc:call(Node, partisan_peer_service, members, []) of
-                            {ok, Members} ->
-                                  case lists:usort(Members) =:= SortedMembers of
-                                      true ->
-                                          ok;
-                                      false ->
-                                          ct:fail(missing_members)
-                                  end;
-                            Error ->
-                                  ct:fail("Cannot retrieve membership: ~p", [Error])
-                          end
-                  end, Nodes),
     ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
@@ -707,3 +694,22 @@ wait_until_all_connections(Nodes) ->
         end,
     wait_until(F).
 
+%% @private
+verify_partisan_membership(Nodes) ->
+    R = lists:map(fun(Node) ->
+                          case rpc:call(Node, partisan_peer_service, members, []) of
+                            {ok, JoinedNodes} ->
+                                  lists:usort(JoinedNodes) =:= Nodes;
+                            Error ->
+                                  ct:fail("Cannot retrieve membership: ~p", [Error])
+                          end
+                  end, Nodes),
+
+    lists:all(fun(X) -> X =:= true end, R).
+
+%% @private
+wait_until_partisan_membership(Nodes) ->
+    F = fun() ->
+                verify_partisan_membership(Nodes)
+        end,
+    wait_until(F).
