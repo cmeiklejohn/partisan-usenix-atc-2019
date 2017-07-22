@@ -43,6 +43,8 @@
 -define(CLIENT_NUMBER, 3).
 -define(PEER_PORT, 9000).
 -define(SLEEP, 30000).
+-define(PARALLELISM, 5).
+
 
 %% ===================================================================
 %% common_test callbacks
@@ -93,17 +95,8 @@ transition_test(Config) ->
     %% Cluster the first two ndoes.
     ok = join_cluster([Node1, Node2]),
 
-    timer:sleep(?SLEEP),
-
-    %% Ensure we have the right number of connections.
-    lists:foreach(fun(Node) ->
-                          case rpc:call(Node, partisan_peer_service, connections, []) of
-                            {ok, Connections} ->
-                                  verify_connections(Node, [Node1, Node2], Connections);
-                            Error ->
-                                  ct:fail("Cannot retrieve connections: ~p", [Error])
-                          end
-                  end, [Node1, Node2]),
+    %% Verify appropriate number of connections.
+    ?assertEqual(ok, wait_until_all_connections([Node1, Node2])),
 
     %% Put a value into the metadata system.
     Prefix = {unir, test},
@@ -128,17 +121,8 @@ transition_test(Config) ->
     %% Plan will only succeed once the ring has been gossiped.
     plan_and_commit(Node1),
 
-    timer:sleep(?SLEEP),
-
-    %% Ensure we have the right number of connections.
-    lists:foreach(fun(Node) ->
-                          case rpc:call(Node, partisan_peer_service, connections, []) of
-                            {ok, Connections} ->
-                                  verify_connections(Node, [Node1, Node2, Node3], Connections);
-                            Error ->
-                                  ct:fail("Cannot retrieve connections: ~p", [Error])
-                          end
-                  end, [Node1, Node2, Node3]),
+    %% Verify appropriate number of connections.
+    ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3])),
 
     %% Join the fourth node.
     staged_join(Node4, Node1),
@@ -151,17 +135,8 @@ transition_test(Config) ->
     %% Plan will only succeed once the ring has been gossiped.
     plan_and_commit(Node1),
 
-    timer:sleep(?SLEEP),
-
-    %% Ensure we have the right number of connections.
-    lists:foreach(fun(Node) ->
-                          case rpc:call(Node, partisan_peer_service, connections, []) of
-                            {ok, Connections} ->
-                                  verify_connections(Node, [Node1, Node2, Node3, Node4], Connections);
-                            Error ->
-                                  ct:fail("Cannot retrieve connections: ~p", [Error])
-                          end
-                  end, [Node1, Node2, Node3, Node4]),
+    %% Verify appropriate number of connections.
+    ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3, Node4])),
 
     %% Verify that we can read that value at all nodes.
     lists:foreach(fun({_, OtherNode}) ->
@@ -220,9 +195,7 @@ membership_test(Config) ->
                   [{partisan_peer_service_manager,
                     partisan_default_peer_service_manager}]),
 
-    SortedMembers = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    timer:sleep(?SLEEP),
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
@@ -239,16 +212,11 @@ membership_test(Config) ->
                                   ct:fail("Cannot retrieve membership: ~p", [Error])
                           end
                   end, Nodes),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
-    lists:foreach(fun({_Name, Node}) ->
-                          case rpc:call(Node, partisan_peer_service, connections, []) of
-                            {ok, Connections} ->
-                                  verify_connections(Node, SortedMembers, Connections);
-                            Error ->
-                                  ct:fail("Cannot retrieve connections: ~p", [Error])
-                          end
-                  end, Nodes),
+    %% Verify appropriate number of connections.
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
 
     stop(Nodes),
 
@@ -322,7 +290,7 @@ start(_Case, Config, Options) ->
 
     %% Load applications on all of the nodes.
     LoaderFun = fun({Name, Node}) ->
-                            ct:pal("Loading applications on node: ~p", [Node]),
+                            % ct:pal("Loading applications on node: ~p", [Node]),
 
                             PrivDir = proplists:get_value(priv_dir, Config),
                             NodeDir = filename:join([PrivDir, Node]),
@@ -681,27 +649,61 @@ del_all_files([Dir | T], EmptyDirs) ->
    del_all_files(T ++ Dirs, [Dir | EmptyDirs]).
 
 %% @private
-verify_connections(Me, Others, Connections) ->
+verify_open_connections(Me, Others, Connections) ->
     %% Verify we have connections to the peers we should have.
-    lists:foreach(fun(Other) ->
+    R = lists:map(fun(Other) ->
                         case dict:find(Other, Connections) of
                             {ok, Active} ->
                                 case length(Active) of
-                                    5 ->
-                                        ok;
+                                    ?PARALLELISM ->
+                                        % ct:pal("Node ~p is connected to ~p", [Me, Other]),
+                                        true;
                                     OtherNumber ->
-                                        ct:fail("Incorrect number (~p) of connections for peer ~p at peer ~p",
-                                                [OtherNumber, Other, Me])
+                                        % ct:pal("Incorrect number (~p) of connections for peer ~p at peer ~p", [OtherNumber, Other, Me]),
+                                        false
                                 end;
                             error ->
-                                ct:fail("No entry for peer ~p at peer ~p.", [Other, Me])
+                                % ct:pal("No entry for peer ~p at peer ~p.", [Other, Me]),
+                                false
                         end
                   end, Others -- [Me]),
 
+    OthersOpen = lists:all(fun(X) -> X =:= true end, R),
+
     %% Verify we don't have connetions to ourself.
-    case dict:find(Me, Connections) of
+    SelfOpen = case dict:find(Me, Connections) of
         {ok, Active} ->
-            ct:fail("~p active connections to ourself!", [length(Active)]);
+            % ct:pal("~p active connections to ourself!", [length(Active)]),
+            false;
         error ->
-            ok
-    end.
+            true
+    end,
+
+    SelfOpen andalso OthersOpen.
+
+%% @private
+verify_all_connections(Nodes) ->
+    % ct:pal("Verifying connections for nodes: ~p", [Nodes]),
+
+    R = lists:map(fun(Node) ->
+                        % ct:pal("Verifying connections for node: ~p", [Node]),
+
+                        case rpc:call(Node, partisan_peer_service, connections, []) of
+                            {ok, Connections} ->
+                                verify_open_connections(Node, Nodes, Connections);
+                            Error ->
+                                % ct:pal("Cannot retrieve connections: ~p", [Error]),
+                                false
+
+                          end
+                  end, Nodes),
+
+    lists:all(fun(X) -> X =:= true end, R).
+
+%% @private
+wait_until_all_connections(Nodes) ->
+    F = fun() ->
+                verify_all_connections(Nodes)
+        end,
+    wait_until(F).
+
