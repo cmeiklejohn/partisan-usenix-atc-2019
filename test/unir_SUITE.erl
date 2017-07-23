@@ -291,13 +291,11 @@ start(_Case, Config, Options) ->
     ConfigureFun = fun({_Name, Node}) ->
             %% Configure the peer service.
             PeerService = proplists:get_value(partisan_peer_service_manager, Options),
-            ok = rpc:call(Node, partisan_config, set,
-                          [partisan_peer_service_manager, PeerService]),
+            ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager, PeerService]),
 
             MaxActiveSize = proplists:get_value(max_active_size, Options, 5),
-            ok = rpc:call(Node, partisan_config, set,
-                          [max_active_size, MaxActiveSize]),
-
+            ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
+            ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
             ok = rpc:call(Node, partisan_config, set, [parallelism, 5])
     end,
