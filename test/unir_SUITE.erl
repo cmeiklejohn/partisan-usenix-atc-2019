@@ -127,6 +127,12 @@ transition_test(Config) ->
     %% Verify that we can read that value at all nodes.
     ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
 
+    %% Leave a node.
+    ?assertEqual(ok, leave(Node3)),
+
+    %% Verify appropriate number of connections.
+    ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node4])),
+
     stop(Nodes),
 
     ok.
@@ -690,6 +696,15 @@ verify_metadata_read(Nodes) ->
 %% @private
 metadata_write(Node) ->
     case rpc:call(Node, riak_core_metadata, put, [?PREFIX, ?KEY, ?VALUE]) of
+        ok ->
+            ok;
+        _ ->
+            error
+    end.
+
+%% @private
+leave(Node) ->
+    case rpc:call(Node, riak_core, leave, []) of
         ok ->
             ok;
         _ ->
