@@ -95,61 +95,37 @@ transition_test(Config) ->
     %% Get the list of nodes.
     [{_, Node1}, {_, Node2}, {_, Node3}, {_, Node4}] = Nodes,
 
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
     %% Cluster the first two ndoes.
-    ok = join_cluster([Node1, Node2]),
+    ?assertEqual(ok, join_cluster([Node1, Node2])),
 
     %% Verify appropriate number of connections.
     ?assertEqual(ok, wait_until_all_connections([Node1, Node2])),
 
-    %% Put a value into the metadata system.
-    Prefix = {unir, test},
-    Key = key,
-    Value = value,
-
-    case rpc:call(Node1, riak_core_metadata, put, [Prefix, Key, Value]) of
-        ok ->
-            ok;
-        PutError ->
-            ct:fail("~p", [PutError])
-    end,
+    %% Perform metadata storage write.
+    ?assertEqual(ok, metadata_write(Node1)),
 
     %% Join the third node.
-    staged_join(Node3, Node1),
-
-    %% Sleep is required for partisan to setup the TCP connections
-    %% necessary for the information to reach the ring and be available
-    %% for the commit.
-    timer:sleep(?SLEEP),
+    ?assertEqual(ok, staged_join(Node3, Node1)),
 
     %% Plan will only succeed once the ring has been gossiped.
-    plan_and_commit(Node1),
+    ?assertEqual(ok, plan_and_commit(Node1)),
 
     %% Verify appropriate number of connections.
     ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3])),
 
     %% Join the fourth node.
-    staged_join(Node4, Node1),
-
-    %% Sleep is required for partisan to setup the TCP connections
-    %% necessary for the information to reach the ring and be available
-    %% for the commit.
-    timer:sleep(?SLEEP),
+    ?assertEqual(ok, staged_join(Node4, Node1)),
 
     %% Plan will only succeed once the ring has been gossiped.
-    plan_and_commit(Node1),
+    ?assertEqual(ok, plan_and_commit(Node1)),
 
     %% Verify appropriate number of connections.
     ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3, Node4])),
 
     %% Verify that we can read that value at all nodes.
-    lists:foreach(fun({_, OtherNode}) ->
-                          case rpc:call(OtherNode, riak_core_metadata, get, [Prefix, Key]) of
-                              Value ->
-                                  ok;
-                              GetError ->
-                                  ct:fail("~p", [GetError])
-                          end
-                  end,  Nodes),
+    ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
 
     stop(Nodes),
 
@@ -167,12 +143,7 @@ metadata_test(Config) ->
     [{_Name, Node}|_] = Nodes,
 
     %% Put a value into the metadata system.
-    case rpc:call(Node, riak_core_metadata, put, [?PREFIX, ?KEY, ?VALUE]) of
-        ok ->
-            ok;
-        PutError ->
-            ct:fail("~p", [PutError])
-    end,
+    ?assertEqual(ok, metadata_write(Node)),
 
     %% Verify that we can read that value at all nodes.
     ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
@@ -706,12 +677,14 @@ wait_until_partisan_membership(Nodes) ->
         end,
     wait_until(F).
 
+%% @private
 wait_until_metadata_read(Nodes) ->
     F = fun() ->
                 verify_metadata_read(Nodes)
         end,
     wait_until(F).
 
+%% @private
 verify_metadata_read(Nodes) ->
     %% Verify that we can read that value at all nodes.
     R = lists:map(fun(Node) ->
@@ -724,3 +697,12 @@ verify_metadata_read(Nodes) ->
                   end,  Nodes),
 
     lists:all(fun(X) -> X =:= true end, R).
+
+%% @private
+metadata_write(Node) ->
+    case rpc:call(Node, riak_core_metadata, put, [?PREFIX, ?KEY, ?VALUE]) of
+        ok ->
+            ok;
+        _ ->
+            error
+    end.
