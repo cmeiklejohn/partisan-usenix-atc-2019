@@ -606,14 +606,11 @@ verify_open_connections(Me, Others, Connections) ->
                             {ok, Active} ->
                                 case length(Active) of
                                     ?PARALLELISM ->
-                                        % ct:pal("Node ~p is connected to ~p", [Me, Other]),
                                         true;
-                                    OtherNumber ->
-                                        % ct:pal("Incorrect number (~p) of connections for peer ~p at peer ~p", [OtherNumber, Other, Me]),
+                                    _ ->
                                         false
                                 end;
                             error ->
-                                % ct:pal("No entry for peer ~p at peer ~p.", [Other, Me]),
                                 false
                         end
                   end, Others -- [Me]),
@@ -622,8 +619,7 @@ verify_open_connections(Me, Others, Connections) ->
 
     %% Verify we don't have connetions to ourself.
     SelfOpen = case dict:find(Me, Connections) of
-        {ok, Active} ->
-            % ct:pal("~p active connections to ourself!", [length(Active)]),
+        {ok, _} ->
             false;
         error ->
             true
@@ -633,16 +629,11 @@ verify_open_connections(Me, Others, Connections) ->
 
 %% @private
 verify_all_connections(Nodes) ->
-    % ct:pal("Verifying connections for nodes: ~p", [Nodes]),
-
     R = lists:map(fun(Node) ->
-                        % ct:pal("Verifying connections for node: ~p", [Node]),
-
                         case rpc:call(Node, partisan_peer_service, connections, []) of
                             {ok, Connections} ->
                                 verify_open_connections(Node, Nodes, Connections);
-                            Error ->
-                                % ct:pal("Cannot retrieve connections: ~p", [Error]),
+                            _ ->
                                 false
 
                           end
