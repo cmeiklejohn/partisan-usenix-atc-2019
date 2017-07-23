@@ -486,9 +486,9 @@ do_commit(Node) ->
             maybe_wait_for_changes(Node),
             do_commit(Node);
         {error, nothing_planned} ->
-            %% Assume plan actually committed somehow
-            ct:fail("Nothing planned!"),
-            ok;
+            %% Keep waiting...
+            % ct:pal("Nothing planned!"),
+            plan_and_commit(Node);
         ok ->
             ok
     end.
