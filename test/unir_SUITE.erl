@@ -607,7 +607,6 @@ verify_open_connections(Me, Others, Connections) ->
     %% Verify we have connections to the peers we should have.
     R = lists:map(fun(Other) ->
                         OtherName = rpc:call(Other, partisan_peer_service_manager, myself, []),
-
                         case dict:find(OtherName, Connections) of
                             {ok, Active} ->
                                 case length(Active) of
