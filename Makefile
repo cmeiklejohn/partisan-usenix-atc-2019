@@ -29,7 +29,7 @@ compile:
 clean:
 	$(REBAR) clean
 
-test:
+test: release
 	$(REBAR) ct
 
 devrel1:
