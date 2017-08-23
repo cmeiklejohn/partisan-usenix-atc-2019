@@ -1,5 +1,5 @@
 BASEDIR = $(shell pwd)
-REBAR = rebar3
+REBAR = ./rebar3
 RELPATH = _build/default/rel/unir
 PRODRELPATH = _build/prod/rel/unir
 APPNAME = unir
