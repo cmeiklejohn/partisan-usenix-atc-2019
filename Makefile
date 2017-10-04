@@ -5,6 +5,9 @@ PRODRELPATH = _build/prod/rel/unir
 APPNAME = unir
 SHELL = /bin/bash
 
+compile:
+	$(REBAR) compile
+
 release:
 	$(REBAR) release
 	mkdir -p $(RELPATH)/../unir_config
@@ -22,9 +25,6 @@ prod-release:
 
 prod-console:
 	cd $(PRODRELPATH) && ./bin/unir console
-
-compile:
-	$(REBAR) compile
 
 clean:
 	$(REBAR) clean
