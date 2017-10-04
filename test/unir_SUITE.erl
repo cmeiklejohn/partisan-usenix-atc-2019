@@ -168,10 +168,12 @@ membership_test(Config) ->
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
+    ct:pal("Waiting for partisan membership..."),
     ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
     %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
     ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
 
     stop(Nodes),
@@ -185,6 +187,8 @@ membership_test(Config) ->
 %% @private
 stop(Nodes) ->
     StopFun = fun({Name, _Node}) ->
+        ct:pal("Stopping node: ~p", [Name]),
+
         case ct_slave:stop(Name) of
             {ok, _} ->
                 ok;
