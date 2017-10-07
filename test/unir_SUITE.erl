@@ -201,13 +201,25 @@ vnode_test(Config) ->
 
     %% Get the list of nodes.
     ct:pal("Nodes is: ~p", [Nodes]),
-    [{_, Node1}, {_, Node2}, {_, Node3}] = Nodes,
+    [{_, Node1}, {_, _Node2}, {_, _Node3}] = Nodes,
 
     %% Attempt to access the vnode request API.
     %% This will test command/3 and command/4 behavior.
     ct:pal("Waiting for response from ping command..."),
-    Result = rpc:call(Node1, unir, ping, []),
-    ?assertEqual(ok, Result),
+    CommandResult = rpc:call(Node1, unir, ping, []),
+    ?assertEqual(ok, CommandResult),
+
+    %% Attempt to access the vnode request API.
+    %% This will test sync_command/3 and sync_command/4 behavior.
+    ct:pal("Waiting for response from sync_ping command..."),
+    SyncCommandResult = rpc:call(Node1, unir, sync_ping, []),
+    ?assertMatch({pong, _}, SyncCommandResult),
+
+    %% Attempt to access the vnode request API.
+    %% This will test sync_spawn_command/3 and sync_spawn_command/4 behavior.
+    ct:pal("Waiting for response from sync_spawn_ping command..."),
+    SyncSpawnCommandResult = rpc:call(Node1, unir, sync_spawn_ping, []),
+    ?assertMatch({pong, _}, SyncSpawnCommandResult),
 
     stop(Nodes),
 
