@@ -5,6 +5,9 @@ PRODRELPATH = _build/prod/rel/unir
 APPNAME = unir
 SHELL = /bin/bash
 
+logs:
+	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs cat
+
 compile:
 	$(REBAR) compile
 
