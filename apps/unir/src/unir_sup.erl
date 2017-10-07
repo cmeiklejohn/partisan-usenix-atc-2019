@@ -20,10 +20,9 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
-    VMaster = { unir_vnode_master,
-                  {riak_core_vnode_master, start_link, [unir_vnode]},
-                  permanent, 5000, worker, [riak_core_vnode_master]},
+    VMaster = {unir_vnode_master,
+               {riak_core_vnode_master, start_link, [unir_vnode]},
+                permanent, 5000, worker, [riak_core_vnode_master]},
 
-    { ok,
-        { {one_for_one, 5, 10},
-          [VMaster]}}.
+    {ok,
+        {{one_for_one, 5, 10}, [VMaster]}}.
