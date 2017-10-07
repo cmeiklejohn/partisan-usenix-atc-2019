@@ -77,7 +77,8 @@ all() ->
     [
      membership_test,
      metadata_test,
-     transition_test
+     transition_test,
+     vnode_test
     ].
 
 %% ===================================================================
@@ -175,6 +176,38 @@ membership_test(Config) ->
     %% Verify appropriate number of connections.
     ct:pal("Waiting for partisan connections..."),
     ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    stop(Nodes),
+
+    ok.
+
+vnode_test(Config) ->
+    Nodes = start(vnode_test,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
+    ct:pal("Waiting for partisan membership..."),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
+
+    %% Ensure we have the right number of connections.
+    %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    %% Get the list of nodes.
+    ct:pal("Nodes is: ~p", [Nodes]),
+    [{_, Node1}, {_, Node2}, {_, Node3}] = Nodes,
+
+    %% Attempt to access the vnode request API.
+    %% This will test command/3 and command/4 behavior.
+    ct:pal("Waiting for response from ping command..."),
+    Result = rpc:call(Node1, unir, ping, []),
+    ?assertEqual(ok, Result),
 
     stop(Nodes),
 
