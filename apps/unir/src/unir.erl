@@ -16,4 +16,5 @@ ping() ->
     DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(os:timestamp())}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, unir),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, unir_vnode_master).
+    lager:info("cmeik Preference list: ~p", [PrefList]),
+    riak_core_vnode_master:command(IndexNode, ping, unir_vnode_master).
