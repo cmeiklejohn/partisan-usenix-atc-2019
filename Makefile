@@ -17,6 +17,9 @@ release:
 console:
 	cd $(RELPATH) && ./bin/unir console
 
+large-membership-test:
+	./rebar3 ct --readable=f -v --suite=unir_SUITE --case=large_membership_test
+
 logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs cat
 
