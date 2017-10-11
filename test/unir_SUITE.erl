@@ -75,6 +75,7 @@ end_per_group(_, _Config) ->
 
 all() ->
     [
+     %% large_membership_test, %% Run outside of suite.
      membership_test,
      metadata_test,
      transition_test,
@@ -159,10 +160,34 @@ metadata_test(Config) ->
 
     ok.
 
+large_membership_test(Config) ->
+    Nodes = start(large_membership_test,
+                  Config,
+                  [{num_nodes, 5},
+                   {partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
+    ct:pal("Waiting for partisan membership..."),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
+
+    %% Ensure we have the right number of connections.
+    %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    stop(Nodes),
+
+    ok.
+
 membership_test(Config) ->
     Nodes = start(membership_test,
                   Config,
-                  [{partisan_peer_service_manager,
+                  [{num_nodes, 4},
+                   {partisan_peer_service_manager,
                     partisan_default_peer_service_manager}]),
 
     SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
@@ -433,8 +458,10 @@ join_cluster(Nodes) ->
                     [staged_join(Node, Node1) || Node <- OtherNodes],
 
                     %% Sleep for partisan connections to be setup.
+                    ct:pal("Sleeping for partisan connections to be established..."),
                     timer:sleep(?SLEEP),
 
+                    ct:pal("Planning and committing cluster changes."),
                     plan_and_commit(Node1),
 
                     try_nodes_ready(Nodes, 3, 500);
@@ -521,7 +548,7 @@ do_commit(Node) ->
 
 %% @private
 try_nodes_ready([Node1 | _Nodes], 0, _SleepMs) ->
-      lager:info("Nodes not ready after initial plan/commit, retrying"),
+      ct:pal("Nodes not ready after initial plan/commit, retrying"),
       plan_and_commit(Node1);
 try_nodes_ready(Nodes, N, SleepMs) ->
       ReadyNodes = [Node || Node <- Nodes, is_ready(Node) =:= true],
