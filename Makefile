@@ -8,12 +8,6 @@ SHELL = /bin/bash
 compile:
 	$(REBAR) compile
 
-kill:
-	pkill -9 beam.smp; exit 0
-
-large-membership-test: kill
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --case=large-membership_test
-
 release:
 	$(REBAR) release
 	mkdir -p $(RELPATH)/../unir_config
