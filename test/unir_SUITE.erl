@@ -162,7 +162,7 @@ metadata_test(Config) ->
 large_membership_test(Config) ->
     Nodes = start(membership_test,
                   Config,
-                  [{num_nodes, 3},
+                  [{num_nodes, 5},
                    {partisan_peer_service_manager,
                     partisan_default_peer_service_manager}]),
 
