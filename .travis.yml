@@ -6,6 +6,7 @@ install:
   - ./rebar3 update
 script:
   - make test
+  - make large-membership-test
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
