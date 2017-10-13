@@ -85,6 +85,52 @@ all() ->
 %% Tests.
 %% ===================================================================
 
+large_scale_up_test(Config) ->
+    case os:getenv("TRAVIS") of
+        "true" ->
+            Nodes = start(scale_up_test,
+                        Config,
+                        [{partisan_peer_service_manager,
+                            partisan_default_peer_service_manager},
+                        {num_nodes, 25},
+                        {cluster_nodes, false}]),
+
+            %% Get the list of the first nodes and cluster them.
+            [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
+            InitialCluster = [Node1, Node2],
+
+            %% Cluster the first two ndoes.
+            ct:pal("Building initial cluster: ~p", [InitialCluster]),
+            ?assertEqual(ok, join_cluster(InitialCluster)),
+
+            %% Verify appropriate number of connections.
+            ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
+            ?assertEqual(ok, wait_until_all_connections(InitialCluster)),
+
+            lists:foldl(fun({_, Node}, CurrentCluster) ->
+                %% Join another node.
+                ct:pal("Joining ~p to ~p", [Node, Node1]),
+                ?assertEqual(ok, staged_join(Node, Node1)),
+
+                %% Plan will only succeed once the ring has been gossiped.
+                ct:pal("Committing plan."),
+                ?assertEqual(ok, plan_and_commit(Node1)),
+
+                %% Verify appropriate number of connections.
+                NewCluster = CurrentCluster ++ [Node],
+                ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
+                ?assertEqual(ok, wait_until_all_connections(NewCluster)),
+
+                NewCluster
+            end, InitialCluster, ToBeJoined),
+            
+            stop(Nodes);
+        _ ->
+            ct:pal("Skipping test; outside of the travis environment.")
+    end,
+
+    ok.
+
 scale_up_test(Config) ->
     Nodes = start(scale_up_test,
                   Config,

@@ -29,6 +29,9 @@ tail-logs:
 scale-up-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --case=scale_up_test
 
+large-scale-up-test:
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --case=large_scale_up_test
+
 prod-release:
 	$(REBAR) as prod release
 	mkdir -p $(PRODRELPATH)/../unir_config

@@ -7,6 +7,7 @@ install:
 script:
   - make test
   - make scale-up-test
+  - make large-scale-up-test
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
