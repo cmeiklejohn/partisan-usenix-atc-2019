@@ -159,33 +159,11 @@ metadata_test(Config) ->
 
     ok.
 
-large_membership_test(Config) ->
-    Nodes = start(membership_test,
-                  Config,
-                  [{num_nodes, 4},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    stop(Nodes),
-
-    ok.
-
 membership_test(Config) ->
     Nodes = start(membership_test,
                   Config,
-                  [{partisan_peer_service_manager,
+                  [{num_nodes, 3},
+                   {partisan_peer_service_manager,
                     partisan_default_peer_service_manager}]),
 
     SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),

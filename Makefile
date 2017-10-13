@@ -14,11 +14,11 @@ release:
 	[ -f $(RELPATH)/../unir_config/unir.conf ] || cp $(RELPATH)/etc/unir.conf  $(RELPATH)/../unir_config/unir.conf
 	[ -f $(RELPATH)/../unir_config/advanced.config ] || cp $(RELPATH)/etc/advanced.config  $(RELPATH)/../unir_config/advanced.config
 
+kill: 
+	pkill -9 beam.smp; exit 0
+
 console:
 	cd $(RELPATH) && ./bin/unir console
-
-large-membership-test:
-	./rebar3 ct --readable=f -v --suite=unir_SUITE --case=large_membership_test
 
 logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs cat
@@ -35,7 +35,7 @@ prod-console:
 clean:
 	$(REBAR) clean
 
-test: release
+test: kill release
 	$(REBAR) ct
 
 devrel1:
