@@ -67,7 +67,7 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
-init_per_group(with_partisan, Config) ->
+init_per_group(default_with_partisan, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(_, Config) ->
     Config.
@@ -77,7 +77,8 @@ end_per_group(_, _Config) ->
 
 all() ->
     [
-     {group, default, []}
+     {group, default, []},
+     {group, default_with_partisan, []}
     ].
 
 groups() ->
@@ -86,7 +87,7 @@ groups() ->
       [{group, basic}]
      },
 
-     {with_partisan, [],
+     {default_with_partisan, [],
       [{group, basic}]
      },
 
