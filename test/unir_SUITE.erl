@@ -67,6 +67,8 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
+init_per_group(with_partisan, Config) ->
+    [{partisan_dispatch, true}] ++ Config;
 init_per_group(_, Config) ->
     Config.
 
@@ -75,10 +77,28 @@ end_per_group(_, _Config) ->
 
 all() ->
     [
-     membership_test,
-     metadata_test,
-     transition_test,
-     vnode_test
+     {group, default, []},
+     {group, with_partisan, []}
+    ].
+
+groups() ->
+    [
+     {default, [],
+      [{group, basic}]
+     },
+
+     {with_partisan, [],
+      [{group, basic}]
+     },
+
+     {basic, [],
+      [membership_test, metadata_test, transition_test, vnode_test]},
+
+     {scale, [],
+      [scale_up_test]},
+
+     {large_scale, [],
+      [large_scale_up_test]}
     ].
 
 %% ===================================================================
