@@ -26,6 +26,9 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
+scale-up-test:
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --case=scale_up_test
+
 prod-release:
 	$(REBAR) as prod release
 	mkdir -p $(PRODRELPATH)/../unir_config

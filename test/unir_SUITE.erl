@@ -75,7 +75,6 @@ end_per_group(_, _Config) ->
 
 all() ->
     [
-     scale_up_test,
      membership_test,
      metadata_test,
      transition_test,
@@ -91,12 +90,12 @@ scale_up_test(Config) ->
                   Config,
                   [{partisan_peer_service_manager,
                     partisan_default_peer_service_manager},
-                   {num_nodes, 9},
+                   {num_nodes, 10},
                    {cluster_nodes, false}]),
 
-    %% Get the list of the first three nodes and cluster them.
-    [{_, Node1}, {_, Node2}, {_, Node3}|ToBeJoined] = Nodes,
-    InitialCluster = [Node1, Node2, Node3],
+    %% Get the list of the first nodes and cluster them.
+    [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
+    InitialCluster = [Node1, Node2],
 
     %% Cluster the first two ndoes.
     ct:pal("Building initial cluster: ~p", [InitialCluster]),
@@ -118,7 +117,7 @@ scale_up_test(Config) ->
         %% Verify appropriate number of connections.
         NewCluster = CurrentCluster ++ [Node],
         ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
-        ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3])),
+        ?assertEqual(ok, wait_until_all_connections(NewCluster)),
 
         NewCluster
     end, InitialCluster, ToBeJoined),
