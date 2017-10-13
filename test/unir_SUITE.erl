@@ -88,12 +88,12 @@ all() ->
 large_scale_up_test(Config) ->
     case os:getenv("TRAVIS") of
         "true" ->
-            Nodes = start(scale_up_test,
-                        Config,
-                        [{partisan_peer_service_manager,
-                            partisan_default_peer_service_manager},
-                        {num_nodes, 25},
-                        {cluster_nodes, false}]),
+            Nodes = start(large_scale_up_test,
+                          Config,
+                          [{partisan_peer_service_manager,
+                              partisan_default_peer_service_manager},
+                          {num_nodes, 25},
+                          {cluster_nodes, false}]),
 
             %% Get the list of the first nodes and cluster them.
             [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
