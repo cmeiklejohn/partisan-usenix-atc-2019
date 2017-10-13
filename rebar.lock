@@ -62,7 +62,7 @@
  {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},1},
  {<<"riak_core">>,
   {git,"git://github.com/lasp-lang/riak_core",
-       {ref,"5a913bdcd56c54e65da0e1347e424eb046a38706"}},
+       {ref,"1987875d5c6c19950ccde27dbd7c3ff222424303"}},
   0},
  {<<"riak_ensemble">>,
   {git,"git://github.com/Kyorai/riak_ensemble",
