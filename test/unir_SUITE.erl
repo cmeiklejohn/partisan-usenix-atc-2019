@@ -75,6 +75,7 @@ end_per_group(_, _Config) ->
 
 all() ->
     [
+     scale_up_test,
      membership_test,
      metadata_test,
      transition_test,
@@ -84,6 +85,45 @@ all() ->
 %% ===================================================================
 %% Tests.
 %% ===================================================================
+
+scale_up_test(Config) ->
+    Nodes = start(scale_up_test,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager},
+                   {num_nodes, 5},
+                   {cluster_nodes, false}]),
+
+    %% Get the list of the first three nodes and cluster them.
+    [{_, Node1}, {_, Node2}, {_, Node3}|ToBeJoined] = Nodes,
+    InitialCluster = [Node1, Node2, Node3],
+
+    %% Cluster the first two ndoes.
+    ct:pal("Building initial cluster: ~p", [InitialCluster]),
+    ?assertEqual(ok, join_cluster(InitialCluster)),
+
+    %% Verify appropriate number of connections.
+    ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
+    ?assertEqual(ok, wait_until_all_connections(InitialCluster)),
+
+    lists:foldl(fun({_, Node}, CurrentCluster) ->
+        %% Join another node.
+        ct:pal("Joining ~p to ~p", [Node, Node1]),
+        ?assertEqual(ok, staged_join(Node, Node1)),
+
+        %% Plan will only succeed once the ring has been gossiped.
+        ct:pal("Committing plan."),
+        ?assertEqual(ok, plan_and_commit(Node1)),
+
+        %% Verify appropriate number of connections.
+        NewCluster = CurrentCluster ++ [Node],
+        ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
+        ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3])),
+
+        NewCluster
+    end, InitialCluster, ToBeJoined),
+
+    ok.
 
 transition_test(Config) ->
     Nodes = start(transition_test,
@@ -710,7 +750,13 @@ verify_partisan_membership(Nodes) ->
     R = lists:map(fun(Node) ->
                           case rpc:call(Node, partisan_peer_service, members, []) of
                             {ok, JoinedNodes} ->
-                                  lists:usort(JoinedNodes) =:= Nodes;
+                                  case lists:usort(JoinedNodes) =:= Nodes of
+                                      true ->
+                                          true;
+                                      false -> 
+                                          ct:pal("Membership on node ~p is not right: ~p but should be ~p", [Node, JoinedNodes, Nodes]),
+                                          false
+                                  end;
                             Error ->
                                   ct:fail("Cannot retrieve membership: ~p", [Error])
                           end
