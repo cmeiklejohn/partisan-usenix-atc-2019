@@ -438,6 +438,8 @@ start(_Case, Config, Options) ->
             PeerService = proplists:get_value(partisan_peer_service_manager, Options),
             ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager, PeerService]),
 
+            ok = rpc:call(Node, application, set_env, [riak_core, partisan_dispatch, ?config(partisan_dispatch, Config)]),
+
             MaxActiveSize = proplists:get_value(max_active_size, Options, 5),
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
