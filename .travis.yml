@@ -6,8 +6,8 @@ install:
   - ./rebar3 update
 script:
   - make test
-  - make scale-up-test
-  - make large-scale-up-test
+  - make scale-test
+  - make large-scale-test
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D

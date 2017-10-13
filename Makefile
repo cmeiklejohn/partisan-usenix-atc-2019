@@ -26,11 +26,11 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
-scale-up-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --case=scale_up_test
+scale-test:
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=scale
 
-large-scale-up-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --case=large_scale_up_test
+large-scale-test:
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=large_scale
 
 prod-release:
 	$(REBAR) as prod release
