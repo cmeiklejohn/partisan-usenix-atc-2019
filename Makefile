@@ -23,6 +23,9 @@ console:
 logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs cat
 
+tail-logs:
+	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
+
 prod-release:
 	$(REBAR) as prod release
 	mkdir -p $(PRODRELPATH)/../unir_config
