@@ -91,7 +91,7 @@ scale_up_test(Config) ->
                   Config,
                   [{partisan_peer_service_manager,
                     partisan_default_peer_service_manager},
-                   {num_nodes, 5},
+                   {num_nodes, 9},
                    {cluster_nodes, false}]),
 
     %% Get the list of the first three nodes and cluster them.
