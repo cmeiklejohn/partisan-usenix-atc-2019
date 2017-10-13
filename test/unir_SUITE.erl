@@ -122,6 +122,8 @@ scale_up_test(Config) ->
 
         NewCluster
     end, InitialCluster, ToBeJoined),
+    
+    stop(Nodes),
 
     ok.
 
