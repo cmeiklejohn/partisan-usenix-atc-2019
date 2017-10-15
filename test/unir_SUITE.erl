@@ -49,6 +49,8 @@
 -define(KEY, key).
 -define(VALUE, value).
 
+-define(CHANNELS, [broadcast, vnode, gossip]).
+
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
@@ -464,7 +466,8 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
-            ok = rpc:call(Node, partisan_config, set, [parallelism, 5])
+            ok = rpc:call(Node, partisan_config, set, [parallelism, 5]),
+            ok = rpc:call(Node, partisan_config, set, [channels, ?CHANNELS])
     end,
     lists:foreach(ConfigureFun, Nodes),
 
@@ -768,10 +771,11 @@ verify_open_connections(Me, Others, Connections) ->
     %% Verify we have connections to the peers we should have.
     R = lists:map(fun(Other) ->
                         OtherName = rpc:call(Other, partisan_peer_service_manager, myself, []),
+                        DesiredConnections = ?PARALLELISM * (length(?CHANNELS) + 1),
                         case dict:find(OtherName, Connections) of
                             {ok, Active} ->
                                 case length(Active) of
-                                    ?PARALLELISM ->
+                                    DesiredConnections ->
                                         true;
                                     _ ->
                                         false
