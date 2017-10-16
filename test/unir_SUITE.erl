@@ -97,7 +97,10 @@ groups() ->
      },
 
      {basic, [],
-      [membership_test, metadata_test, transition_test, vnode_test]},
+      [membership_test, 
+       metadata_test, 
+       %% transition_test, 
+       vnode_test]},
 
      {scale, [],
       [scale_up_test]},
