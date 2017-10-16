@@ -30,16 +30,16 @@ with-partisan-test:
 	$(REBAR) ct --suite=unir_SUITE --group=with_partisan
 
 scale-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=scale
+	$(REBAR) ct --suite=unir_SUITE --group=scale
 
 large-scale-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=large_scale
+	$(REBAR) ct --suite=unir_SUITE --group=large_scale
 
 partisan-scale-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan_scale
+	$(REBAR) ct --suite=unir_SUITE --group=partisan_scale
 
 partisan-large-scale-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan_large_scale
+	$(REBAR) ct --suite=unir_SUITE --group=partisan_large_scale
 
 prod-release:
 	$(REBAR) as prod release
