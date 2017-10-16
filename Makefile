@@ -27,7 +27,7 @@ tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
 with-partisan-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=with_partisan
+	$(REBAR) ct --suite=unir_SUITE --group=with_partisan
 
 scale-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=scale
