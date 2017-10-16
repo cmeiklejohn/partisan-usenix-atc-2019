@@ -83,9 +83,7 @@ end_per_group(_, _Config) ->
 
 all() ->
     [
-     {group, default, []},
-
-     {group, default_with_partisan, []}
+     {group, default, []}
     ].
 
 groups() ->
@@ -94,7 +92,7 @@ groups() ->
       [{group, basic}]
      },
 
-     {default_with_partisan, [],
+     {with_partisan, [],
       [{group, basic}]
      },
 
