@@ -69,6 +69,10 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
+init_per_group(partisan_scale, Config) ->
+    [{partisan_dispatch, true}] ++ Config;
+init_per_group(partisan_large_scale, Config) ->
+    [{partisan_dispatch, true}] ++ Config;
 init_per_group(default_with_partisan, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(_, Config) ->
@@ -80,6 +84,7 @@ end_per_group(_, _Config) ->
 all() ->
     [
      {group, default, []},
+
      {group, default_with_partisan, []}
     ].
 
@@ -100,6 +105,12 @@ groups() ->
       [scale_up_test]},
 
      {large_scale, [],
+      [large_scale_up_test]},
+
+     {partisan_scale, [],
+      [scale_up_test]},
+
+     {partisan_large_scale, [],
       [large_scale_up_test]}
     ].
 

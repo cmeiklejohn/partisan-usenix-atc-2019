@@ -32,6 +32,12 @@ scale-test:
 large-scale-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=large_scale
 
+partisan-scale-test:
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan_scale
+
+partisan-large-scale-test:
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan_large_scale
+
 prod-release:
 	$(REBAR) as prod release
 	mkdir -p $(PRODRELPATH)/../unir_config
