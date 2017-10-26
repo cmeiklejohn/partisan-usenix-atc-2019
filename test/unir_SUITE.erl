@@ -69,6 +69,8 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
+init_per_group(partisan_races, Config) ->
+    [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_large_scale, Config) ->
@@ -89,7 +91,8 @@ all() ->
 groups() ->
     [
      {default, [],
-      [{group, basic}]
+      [{group, basic},
+       {group, races}]
      },
 
      {with_partisan, [],
@@ -101,6 +104,12 @@ groups() ->
        metadata_test, 
        %% transition_test, 
        vnode_test]},
+
+     {races, [],
+      [four_node_membership_test]},
+
+     {partisan_races, [],
+      [four_node_membership_test]},
 
      {scale, [],
       [scale_up_test]},
@@ -280,6 +289,29 @@ metadata_test(Config) ->
 
     ok.
 
+four_node_membership_test(Config) ->
+    Nodes = start(four_node_membership_test,
+                  Config,
+                  [{num_nodes, 4},
+                   {partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
+    ct:pal("Waiting for partisan membership..."),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
+
+    %% Ensure we have the right number of connections.
+    %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    stop(Nodes),
+
+    ok.
+
 membership_test(Config) ->
     Nodes = start(membership_test,
                   Config,
@@ -298,6 +330,17 @@ membership_test(Config) ->
     %% Verify appropriate number of connections.
     ct:pal("Waiting for partisan connections..."),
     ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    stop(Nodes),
+
+    ok.
+
+join_test(Config) ->
+    Nodes = start(join_test,
+                  Config,
+                  [{num_nodes, 3},
+                   {partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
 
     stop(Nodes),
 
@@ -479,7 +522,8 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
             ok = rpc:call(Node, partisan_config, set, [parallelism, 5]),
-            ok = rpc:call(Node, partisan_config, set, [channels, ?CHANNELS])
+            ok = rpc:call(Node, partisan_config, set, [channels, ?CHANNELS]),
+            ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
     lists:foreach(ConfigureFun, Nodes),
 
@@ -704,7 +748,7 @@ is_ready(Node) ->
 
 %% @private
 wait_until_nodes_agree_about_ownership(Nodes) ->
-    % lager:info("Wait until nodes agree about ownership ~p", [Nodes]),
+    ct:pal("Wait until nodes agree about ownership ~p", [Nodes]),
     Results = [ wait_until_owners_according_to(Node, Nodes) || Node <- Nodes ],
     ?assert(lists:all(fun(X) -> ok =:= X end, Results)).
 
@@ -714,6 +758,7 @@ wait_until(Node, Fun) when is_atom(Node), is_function(Fun) ->
 
 %% @private
 wait_until_owners_according_to(Node, Nodes) ->
+    ct:pal("Waiting until node ~p agrees ownership on ~p", [Node, Nodes]),
   SortedNodes = lists:usort(Nodes),
   F = fun(N) ->
       owners_according_to(N) =:= SortedNodes
