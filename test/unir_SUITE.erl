@@ -135,7 +135,7 @@ large_scale_up_test(Config) ->
                           Config,
                           [{partisan_peer_service_manager,
                               partisan_default_peer_service_manager},
-                          {num_nodes, 20},
+                          {num_nodes, 25},
                           {cluster_nodes, false}]),
 
             %% Get the list of the first nodes and cluster them.
