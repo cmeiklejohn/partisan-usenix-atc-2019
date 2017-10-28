@@ -49,7 +49,7 @@
 -define(KEY, key).
 -define(VALUE, value).
 
--define(CHANNELS, [broadcast, vnode, gossip]).
+-define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
 
 %% ===================================================================
 %% common_test callbacks
