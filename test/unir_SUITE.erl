@@ -102,7 +102,7 @@ groups() ->
      {basic, [],
       [membership_test, 
        metadata_test, 
-       %% transition_test, 
+       transition_test, 
        vnode_test]},
 
      {races, [],
