@@ -208,6 +208,14 @@ scale_up_test(Config) ->
         ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
         ?assertEqual(ok, wait_until_all_connections(NewCluster)),
 
+        %% Ensure each node owns a portion of the ring
+        ?assertEqual(ok, wait_until_nodes_agree_about_ownership(NewCluster)),
+        ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
+        ?assertEqual(ok, wait_until_ring_converged(NewCluster)),
+
+        %% Print node 1's membership to the log.
+        rpc:call(Node1, riak_core_console, member_status, [[]]),
+
         NewCluster
     end, InitialCluster, ToBeJoined),
     
