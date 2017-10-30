@@ -522,6 +522,7 @@ start(_Case, Config, Options) ->
             PeerService = proplists:get_value(partisan_peer_service_manager, Options),
             ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager, PeerService]),
 
+            %% Configure partisan dispatch in Riak Core.
             PartisanDispatch = ?config(partisan_dispatch, Config),
             case PartisanDispatch of
                 true ->
