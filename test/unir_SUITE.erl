@@ -137,36 +137,7 @@ large_scale_test(Config) ->
                           {num_nodes, 20},
                           {cluster_nodes, false}]),
 
-            %% Get the list of the first nodes and cluster them.
-            [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
-            InitialCluster = [Node1, Node2],
-
-            %% Cluster the first two ndoes.
-            ct:pal("Building initial cluster: ~p", [InitialCluster]),
-            ?assertEqual(ok, join_cluster(InitialCluster)),
-
-            %% Verify appropriate number of connections.
-            ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
-            ?assertEqual(ok, wait_until_all_connections(InitialCluster)),
-
-            lists:foldl(fun({_, Node}, CurrentCluster) ->
-                %% Join another node.
-                ct:pal("Joining ~p to ~p", [Node, Node1]),
-                ?assertEqual(ok, staged_join(Node, Node1)),
-
-                %% Plan will only succeed once the ring has been gossiped.
-                ct:pal("Committing plan."),
-                ?assertEqual(ok, plan_and_commit(Node1)),
-
-                %% Verify appropriate number of connections.
-                NewCluster = CurrentCluster ++ [Node],
-                ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
-                ?assertEqual(ok, wait_until_all_connections(NewCluster)),
-
-                NewCluster
-            end, InitialCluster, ToBeJoined),
-            
-            stop(Nodes);
+            scale(Nodes);
         _ ->
             ct:pal("Skipping test; outside of the travis environment.")
     end,
@@ -181,50 +152,7 @@ scale_test(Config) ->
                    {num_nodes, 10},
                    {cluster_nodes, false}]),
 
-    %% Get the list of the first nodes and cluster them.
-    [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
-    InitialCluster = [Node1, Node2],
-
-    %% Cluster the first two ndoes.
-    ct:pal("Building initial cluster: ~p", [InitialCluster]),
-    ?assertEqual(ok, join_cluster(InitialCluster)),
-
-    %% Verify appropriate number of connections.
-    ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
-    ?assertEqual(ok, wait_until_all_connections(InitialCluster)),
-
-    lists:foldl(fun({_, Node}, CurrentCluster) ->
-        %% Join another node.
-        ct:pal("Joining ~p to ~p", [Node, Node1]),
-        ?assertEqual(ok, staged_join(Node, Node1)),
-
-        %% Plan will only succeed once the ring has been gossiped.
-        ct:pal("Committing plan."),
-        ?assertEqual(ok, plan_and_commit(Node1)),
-
-        %% Verify appropriate number of connections.
-        NewCluster = CurrentCluster ++ [Node],
-        ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
-        ?assertEqual(ok, wait_until_all_connections(NewCluster)),
-
-        %% Ensure each node owns a portion of the ring
-        ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
-        ?assertEqual(ok, wait_until_ring_converged(NewCluster)),
-
-        %% TODO: Why does this fail at 5 nodes?
-        %%
-        %% Exhibits 5 node membership, each node owns 25% of the ring
-        %% but one node owns 0% so owners_according_to doesn't return the 
-        %% last node.
-        %%
-        %% Fails on both the partisan fork of Riak Core and the 
-        %% FIFO branch fifo-0.9.2.
-        %% ?assertEqual(ok, wait_until_nodes_agree_about_ownership(NewCluster)),
-
-        NewCluster
-    end, InitialCluster, ToBeJoined),
-    
-    stop(Nodes),
+    scale(Nodes),
 
     ok.
 
@@ -960,3 +888,51 @@ leave(Node) ->
         _ ->
             error
     end.
+
+%% @private
+scale(Nodes) ->
+    [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
+    InitialCluster = [Node1, Node2],
+
+    %% Cluster the first two ndoes.
+    ct:pal("Building initial cluster: ~p", [InitialCluster]),
+    ?assertEqual(ok, join_cluster(InitialCluster)),
+
+    %% Verify appropriate number of connections.
+    ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
+    ?assertEqual(ok, wait_until_all_connections(InitialCluster)),
+
+    lists:foldl(fun({_, Node}, CurrentCluster) ->
+        %% Join another node.
+        ct:pal("Joining ~p to ~p", [Node, Node1]),
+        ?assertEqual(ok, staged_join(Node, Node1)),
+
+        %% Plan will only succeed once the ring has been gossiped.
+        ct:pal("Committing plan."),
+        ?assertEqual(ok, plan_and_commit(Node1)),
+
+        %% Verify appropriate number of connections.
+        NewCluster = CurrentCluster ++ [Node],
+        ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
+        ?assertEqual(ok, wait_until_all_connections(NewCluster)),
+
+        %% Ensure each node owns a portion of the ring
+        ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
+        ?assertEqual(ok, wait_until_ring_converged(NewCluster)),
+
+        %% TODO: Why does this fail at 5 nodes?
+        %%
+        %% Exhibits 5 node membership, each node owns 25% of the ring
+        %% but one node owns 0% so owners_according_to doesn't return the 
+        %% last node.
+        %%
+        %% Fails on both the partisan fork of Riak Core and the 
+        %% FIFO branch fifo-0.9.2.
+        %% ?assertEqual(ok, wait_until_nodes_agree_about_ownership(NewCluster)),
+
+        NewCluster
+    end, InitialCluster, ToBeJoined),
+    
+    stop(Nodes),
+
+    ok.
