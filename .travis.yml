@@ -8,10 +8,6 @@ install:
 script:
   - make without-partisan-test
   - make with-partisan-test
-  - make scale-test
-  - make large-scale-test
-  - make partisan-scale-test
-  - make partisan-large-scale-test
   - exit 0
 notifications:
   email: christopher.meiklejohn@gmail.com

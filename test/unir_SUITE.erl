@@ -212,9 +212,6 @@ scale_up_test(Config) ->
         ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
         ?assertEqual(ok, wait_until_ring_converged(NewCluster)),
 
-        %% Print node 1's membership to the log.
-        rpc:call(Node1, riak_core_console, member_status, [[]]),
-
         NewCluster
     end, InitialCluster, ToBeJoined),
     
@@ -526,7 +523,7 @@ start(_Case, Config, Options) ->
             PartisanDispatch = ?config(partisan_dispatch, Config),
             case PartisanDispatch of
                 true ->
-                    ct:pal("Enabling partisan dispatch!", []);
+                    ct:pal("Enabling partisan dispatch on node ~p!", [Node]);
                 _ ->
                     ok
             end,
@@ -643,7 +640,7 @@ owners_according_to(Node) ->
         {ok, Ring} ->
             % lager:info("Ring ~p", [Ring]),
             Owners = [Owner || {_Idx, Owner} <- riak_core_ring:all_owners(Ring)],
-            % lager:info("Owners ~p", [lists:usort(Owners)]),
+            % lager:info("Owners according to ~p: ~p", [Node, lists:usort(Owners)]),
             lists:usort(Owners);
         {badrpc, _}=BadRpc ->
             lager:info("Badrpc"),
