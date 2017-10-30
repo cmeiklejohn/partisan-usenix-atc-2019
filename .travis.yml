@@ -8,6 +8,7 @@ install:
 script:
   - make without-partisan-test
   - make with-partisan-test
+  - make scale-test
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
