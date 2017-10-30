@@ -29,7 +29,7 @@
          init_per_testcase/2,
          end_per_testcase/2,
          all/0,
-         %% groups/0,
+         groups/0,
          init_per_group/2]).
 
 %% tests
@@ -69,13 +69,13 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
+init_per_group(partisan, Config) ->
+    [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_races, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_large_scale, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
-init_per_group(default_with_partisan, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(_, Config) ->
     Config.
@@ -90,20 +90,19 @@ all() ->
 
 groups() ->
     [
-     {default, [],
-      [{group, basic},
-       {group, races}]
-     },
-
-     {with_partisan, [],
-      [{group, basic}]
-     },
-
      {basic, [],
       [membership_test, 
        metadata_test, 
        transition_test, 
        vnode_test]},
+
+     {default, [],
+      [{group, basic}]
+     },
+     
+     {partisan, [],
+      [{group, basic}]
+     },
 
      {races, [],
       [four_node_membership_test]},
@@ -114,11 +113,11 @@ groups() ->
      {scale, [],
       [scale_up_test]},
 
-     {large_scale, [],
-      [large_scale_up_test]},
-
      {partisan_scale, [],
       [scale_up_test]},
+     
+     {large_scale, [],
+      [large_scale_up_test]},
 
      {partisan_large_scale, [],
       [large_scale_up_test]}
