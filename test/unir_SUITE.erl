@@ -120,7 +120,6 @@ groups() ->
       [large_scale_test]},
 
      {partisan_large_scale, [],
-      [large_scale_up_test]}
       [large_scale_test]}
     ].
 
