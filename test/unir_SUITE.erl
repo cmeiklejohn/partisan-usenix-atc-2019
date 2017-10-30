@@ -111,26 +111,27 @@ groups() ->
       [four_node_membership_test]},
 
      {scale, [],
-      [scale_up_test]},
+      [scale_test]},
 
      {partisan_scale, [],
-      [scale_up_test]},
+      [scale_test]},
      
      {large_scale, [],
-      [large_scale_up_test]},
+      [large_scale_test]},
 
      {partisan_large_scale, [],
       [large_scale_up_test]}
+      [large_scale_test]}
     ].
 
 %% ===================================================================
 %% Tests.
 %% ===================================================================
 
-large_scale_up_test(Config) ->
+large_scale_test(Config) ->
     case os:getenv("TRAVIS") of
         "true" ->
-            Nodes = start(large_scale_up_test,
+            Nodes = start(large_scale_test,
                           Config,
                           [{partisan_peer_service_manager,
                               partisan_default_peer_service_manager},
@@ -173,8 +174,8 @@ large_scale_up_test(Config) ->
 
     ok.
 
-scale_up_test(Config) ->
-    Nodes = start(scale_up_test,
+scale_test(Config) ->
+    Nodes = start(scale_test,
                   Config,
                   [{partisan_peer_service_manager,
                     partisan_default_peer_service_manager},
