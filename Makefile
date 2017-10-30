@@ -33,7 +33,7 @@ with-partisan-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan
 
 scale-test:
-	$(REBAR) ct --suite=unir_SUITE --group=scale
+	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=scale
 
 large-scale-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=large_scale
