@@ -27,19 +27,19 @@ tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
 without-partisan-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=default
+	$(REBAR) ct --suite=unir_SUITE --group=default
 
 with-partisan-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan
+	$(REBAR) ct -v --suite=unir_SUITE --group=partisan
 
 scale-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=scale
+	$(REBAR) ct -v --suite=unir_SUITE --group=scale
 
 large-scale-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=large_scale
 
 partisan-scale-test:
-	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan_scale
+	$(REBAR) ct -v --suite=unir_SUITE --group=partisan_scale
 
 partisan-large-scale-test:
 	$(REBAR) ct --readable=false -v --suite=unir_SUITE --group=partisan_large_scale
