@@ -10,8 +10,6 @@ script:
   - make with-partisan-test
   - make scale-test
   - make partisan-scale-test
-  - make large-scale-test
-  - make partisan-large-scale-test
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
