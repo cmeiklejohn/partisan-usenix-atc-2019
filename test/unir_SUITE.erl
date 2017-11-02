@@ -612,7 +612,9 @@ plan_and_commit(Node) ->
             plan_and_commit(Node);
         {ok, _Actions, _RingTransitions} ->
             % ct:pal("Actions for ring transition: ~p", [Actions]),
-            do_commit(Node)
+            do_commit(Node);
+        Other ->
+            ct:fail("Claimant returned: ~p", [Other])
     end.
 
 %% @private
