@@ -43,7 +43,7 @@
 -define(CLIENT_NUMBER, 3).
 -define(PEER_PORT, 9000).
 -define(SLEEP, 30000).
--define(PARALLELISM, 5).
+-define(PARALLELISM, 1).
 
 -define(PREFIX, {unir, test}).
 -define(KEY, key).
@@ -470,7 +470,7 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
-            ok = rpc:call(Node, partisan_config, set, [parallelism, 5]),
+            ok = rpc:call(Node, partisan_config, set, [parallelism, ?PARALLELISM]),
             ok = rpc:call(Node, partisan_config, set, [channels, ?CHANNELS]),
             ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
