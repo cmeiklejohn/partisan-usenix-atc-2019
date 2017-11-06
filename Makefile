@@ -15,10 +15,13 @@ release:
 	[ -f $(RELPATH)/../unir_config/advanced.config ] || cp $(RELPATH)/etc/advanced.config  $(RELPATH)/../unir_config/advanced.config
 
 kill: 
-	pkill -9 beam.smp; exit 0
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
 
 console:
 	cd $(RELPATH) && ./bin/unir console
+
+clear-logs:
+	rm -rf _build/test/logs
 
 logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs cat
@@ -26,22 +29,22 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
-without-partisan-test:
+without-partisan-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=default
 
-with-partisan-test:
+with-partisan-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan
 
-scale-test:
+scale-test: clear-logs kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=scale
 
-large-scale-test:
+large-scale-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=large_scale
 
-partisan-scale-test:
+partisan-scale-test: clear-logs kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_scale
 
-partisan-large-scale-test:
+partisan-large-scale-test: kill
 	$(REBAR) ct -iv --readable=false --suite=unir_SUITE --group=partisan_large_scale
 
 prod-release:
