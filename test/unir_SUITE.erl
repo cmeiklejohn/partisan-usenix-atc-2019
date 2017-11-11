@@ -97,6 +97,10 @@ groups() ->
        vnode_test]},
 
      {default, [],
+      [membership_test]
+     },
+
+     {disterl, [],
       [{group, basic}]
      },
      

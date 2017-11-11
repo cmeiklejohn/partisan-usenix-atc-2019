@@ -6,6 +6,7 @@ install:
   - ./rebar3 update
   - make release
 script:
+  - make test
   - make without-partisan-test
   - make with-partisan-test
   - make scale-test
