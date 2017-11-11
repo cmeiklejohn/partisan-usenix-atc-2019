@@ -30,7 +30,7 @@ tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
 without-partisan-test: kill
-	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=default
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=disterl
 
 with-partisan-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan
