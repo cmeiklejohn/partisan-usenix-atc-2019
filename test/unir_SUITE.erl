@@ -933,6 +933,9 @@ scale(Nodes) ->
 
         NewCluster
     end, InitialCluster, ToBeJoined),
+
+    %% Print final member status to the log.
+    rpc:call(Node1, riak_core_console, member_status, [[]]),
     
     stop(Nodes),
 
