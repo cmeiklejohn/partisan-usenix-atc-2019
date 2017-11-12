@@ -507,7 +507,8 @@ start(_Case, Config, Options) ->
                         %% Start unir.
                         {ok, _}  = rpc:call(Node,
                                             application, ensure_all_started,
-                                            [?APP])
+                                            [?APP]),
+                        ct:pal("Started node ~p", [Node])
                end,
     lists:foreach(StartFun, Nodes),
 
