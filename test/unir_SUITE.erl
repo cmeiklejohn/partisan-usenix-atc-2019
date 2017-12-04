@@ -96,6 +96,7 @@ groups() ->
      {basic, [],
       [membership_test, 
        metadata_test, 
+       large_gossip_test,
        transition_test, 
        vnode_test]},
 
@@ -255,6 +256,38 @@ four_node_membership_test(Config) ->
     %% Verify appropriate number of connections.
     ct:pal("Waiting for partisan connections..."),
     ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    stop(Nodes),
+
+    ok.
+
+large_gossip_test(Config) ->
+    Nodes = start(large_gossip_test,
+                  Config,
+                  [{num_nodes, 5},
+                   {partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
+    ct:pal("Waiting for partisan membership..."),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
+
+    %% Ensure we have the right number of connections.
+    %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    %% Bloat ring.
+    ct:pal("Attempting to bloat the ring to see performance effect..."),
+    Node1 = hd(SortedNodes),
+    ok = rpc:call(Node1, riak_core_ring_manager, bloat_ring, []),
+
+    %% Sleep for gossip rounds.
+    ct:pal("Sleeping for 50 seconds..."),
+    timer:sleep(50000),
 
     stop(Nodes),
 
