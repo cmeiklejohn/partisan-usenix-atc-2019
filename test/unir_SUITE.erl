@@ -97,6 +97,7 @@ groups() ->
       [membership_test, 
        metadata_test, 
        large_gossip_test,
+       timing_test,
        transition_test, 
        vnode_test]},
 
@@ -134,6 +135,54 @@ groups() ->
 %% ===================================================================
 %% Tests.
 %% ===================================================================
+
+timing_test(Config) ->
+    Nodes = start(timing_test,
+                  Config,
+                  [{num_nodes, 3},
+                   {partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
+    ct:pal("Waiting for partisan membership..."),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
+
+    %% Ensure we have the right number of connections.
+    %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    %% Send a bunch of messages.
+    Self = self(),
+    NumMessages = 10000,
+    [Node1, Node2, _Node3] = SortedNodes,
+
+    {Time, _} = timer:tc(fun() ->
+            ct:pal("Performing message dispatch."),
+            lists:foreach(fun(X) ->
+                spawn(fun() ->
+                    ok = rpc:call(Node1, 
+                                riak_core_partisan_utils, 
+                                forward, 
+                                [vnode, Node2, Self, {message, X}])
+                    end)
+                end, lists:seq(1, NumMessages)),
+
+            ct:pal("Receiving messages."),
+            receive
+                {message, NumMessages} ->
+                    ok
+            end
+        end),
+
+    ct:pal("Time for ~p messages: ~p", [NumMessages, Time]),
+
+    stop(Nodes),
+
+    ok.
 
 large_scale_test(Config) ->
     case os:getenv("TRAVIS") of
