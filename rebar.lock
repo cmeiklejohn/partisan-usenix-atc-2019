@@ -67,7 +67,7 @@
  {<<"recon">>,{pkg,<<"recon">>,<<"2.3.2">>},2},
  {<<"riak_core">>,
   {git,"git://github.com/lasp-lang/riak_core",
-       {ref,"140ca47e1d82fd60e39a4f90bc525e7203ab254e"}},
+       {ref,"505ad9a7f349cbe61e6966e8263d2c4b5710b760"}},
   0},
  {<<"riak_ensemble">>,
   {git,"git://github.com/Kyorai/riak_ensemble",
