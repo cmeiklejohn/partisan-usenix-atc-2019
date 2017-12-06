@@ -47,6 +47,9 @@ partisan-scale-test: clear-logs kill
 partisan-large-scale-test: kill
 	$(REBAR) ct -iv --readable=false --suite=unir_SUITE --group=partisan_large_scale
 
+partisan-with-binary-padding: kill
+	$(REBAR) ct -iv --readable=false --suite=unir_SUITE --group=partisan_with_binary_padding
+
 prod-release:
 	$(REBAR) as prod release
 	mkdir -p $(PRODRELPATH)/../unir_config
