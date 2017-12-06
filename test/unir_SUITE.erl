@@ -80,6 +80,8 @@ init_per_group(partisan_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_large_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
+init_per_group(partisan_with_binary_padding, Config) ->
+    [{partisan_dispatch, true}, {binary_padding, true}] ++ Config;
 init_per_group(_, Config) ->
     Config.
 
@@ -129,7 +131,10 @@ groups() ->
       [large_scale_test]},
 
      {partisan_large_scale, [],
-      [large_scale_test]}
+      [large_scale_test]},
+
+     {partisan_with_binary_padding, [],
+      [timing_test]}
     ].
 
 %% ===================================================================
@@ -160,22 +165,45 @@ timing_test(Config) ->
     NumMessages = 10000,
     [Node1, Node2, _Node3] = SortedNodes,
 
+    %% Register a local name for forwarding.
+    Self = self(),
+    LocalName = test,
+
+    %% Use 64-byte binary to force shared heap usage.
+    Padding = rand_bits(512),
+
     {Time, _} = timer:tc(fun() ->
+
+            %% Spawn receiver process on Node2.
+            ReceiverFun = fun() ->
+                receive
+                    {message, Padding, NumMessages} ->
+                        Self ! done
+                end
+            end,
+            ReceiverPid = rpc:call(Node2, erlang, spawn, [ReceiverFun]),
+
+            %% Register name on Node2.
+            true = rpc:call(Node2, erlang, register, [LocalName, ReceiverPid]),
+
+            %% Spawn senders on Node1.
             ct:pal("Performing message dispatch."),
             lists:foreach(fun(X) ->
                 spawn(fun() ->
                     ok = rpc:call(Node1, 
-                                riak_core_partisan_utils, 
-                                forward, 
-                                [vnode, Node2, Self, {message, X}])
+                                  riak_core_partisan_utils, 
+                                  forward, 
+                                  [vnode, Node2, LocalName, {message, Padding, X}])
                     end)
                 end, lists:seq(1, NumMessages)),
 
-            ct:pal("Receiving messages."),
+            %% Wait for receipt acknowledgement.
+            ct:pal("Waiting for receipt acknowledgement."),
             receive
-                {message, NumMessages} ->
+                done ->
                     ok
             end
+
         end),
 
     ct:pal("Time for ~p messages: ~p", [NumMessages, Time]),
@@ -544,6 +572,16 @@ start(_Case, Config, Options) ->
             %% Configure the peer service.
             PeerService = proplists:get_value(partisan_peer_service_manager, Options),
             ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager, PeerService]),
+
+            %% Configure binary padding in Riak Core.
+            BinaryPadding = ?config(binary_padding, Config),
+            case BinaryPadding of
+                true ->
+                    ok = rpc:call(Node, partisan_config, set, [binary_padding, BinaryPadding]),
+                    ct:pal("Enabling binary padding.");
+                _ ->
+                    ok
+            end,
 
             %% Configure partisan dispatch in Riak Core.
             PartisanDispatch = ?config(partisan_dispatch, Config),
@@ -1022,3 +1060,9 @@ scale(Nodes) ->
     stop(Nodes),
 
     ok.
+
+%% @private
+rand_bits(Bits) ->
+        Bytes = (Bits + 7) div 8,
+        <<Result:Bits/bits, _/bits>> = crypto:rand_bytes(Bytes),
+        Result.

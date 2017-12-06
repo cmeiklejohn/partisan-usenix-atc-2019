@@ -1,6 +1,6 @@
 language: erlang
 otp_release:
-  - 19.2
+  - 19.3
 install:
   - make
   - ./rebar3 update
@@ -11,6 +11,7 @@ script:
   - make with-partisan-test
   - make scale-test
   - make partisan-scale-test
+  - make partisan-with-binary-padding
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
