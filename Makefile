@@ -14,7 +14,7 @@ release:
 	[ -f $(RELPATH)/../unir_config/unir.conf ] || cp $(RELPATH)/etc/unir.conf  $(RELPATH)/../unir_config/unir.conf
 	[ -f $(RELPATH)/../unir_config/advanced.config ] || cp $(RELPATH)/etc/advanced.config  $(RELPATH)/../unir_config/advanced.config
 
-kill: 
+kill:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 
 console:
@@ -45,10 +45,10 @@ partisan-scale-test: clear-logs kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_scale
 
 partisan-large-scale-test: kill
-	$(REBAR) ct -iv --readable=false --suite=unir_SUITE --group=partisan_large_scale
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_large_scale
 
 partisan-with-binary-padding: kill
-	$(REBAR) ct -iv --readable=false --suite=unir_SUITE --group=partisan_with_binary_padding
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_binary_padding
 
 prod-release:
 	$(REBAR) as prod release
@@ -114,4 +114,3 @@ stop:
 
 attach:
 	$(BASEDIR)/$(RELPATH)/bin/$(APPNAME) attach
-
