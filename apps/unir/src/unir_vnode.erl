@@ -16,6 +16,8 @@
          handoff_finished/2,
          handle_handoff_data/2,
          encode_handoff_item/2,
+         handle_overload_command/3,
+         handle_overload_info/2,
          handle_coverage/4,
          handle_exit/3]).
 
@@ -48,6 +50,12 @@ handle_command(ping, _Sender, State) ->
 handle_command(Message, _Sender, State) ->
     lager:warning("unhandled_command ~p", [Message]),
     {noreply, State}.
+
+handle_overload_command(_, _, _) ->
+    ok.
+
+handle_overload_info(_, _) ->
+    ok.
 
 handle_handoff_command(_Message, _Sender, State) ->
     {noreply, State}.
