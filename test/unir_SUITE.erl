@@ -82,6 +82,8 @@ init_per_group(partisan_large_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_with_binary_padding, Config) ->
     [{partisan_dispatch, true}, {binary_padding, true}] ++ Config;
+init_per_group(partisan_with_parallelism, Config) ->
+    [{partisan_dispatch, true}, {parallelism, 5}] ++ Config;
 init_per_group(_, Config) ->
     Config.
 
@@ -135,7 +137,12 @@ groups() ->
       [large_scale_test]},
 
      {partisan_with_binary_padding, [],
-      [timing_test]}
+      [timing_test,
+       bench_test]},
+
+     {partisan_with_parallelism, [],
+      [timing_test,
+       bench_test]}
     ].
 
 %% ===================================================================
@@ -641,10 +648,21 @@ start(_Case, Config, Options) ->
             BinaryPadding = ?config(binary_padding, Config),
             case BinaryPadding of
                 true ->
-                    ok = rpc:call(Node, partisan_config, set, [binary_padding, BinaryPadding]),
-                    ct:pal("Enabling binary padding.");
+                    ct:pal("Enabling binary padding."),
+                    ok = rpc:call(Node, partisan_config, set, [binary_padding, BinaryPadding]);
                 _ ->
                     ok
+            end,
+
+            %% Get parallelism factor.
+            Parallelism = ?config(parallelism, Config),
+            case Parallelism of
+                undefined -> 
+                    ct:pal("Using default level of parallelism."),
+                    ok = rpc:call(Node, partisan_config, set, [parallelism, ?PARALLELISM]);
+                _ ->
+                    ct:pal("Using ~p level of parallelism.", [Parallelism]),
+                    ok = rpc:call(Node, partisan_config, set, [parallelism, Parallelism])
             end,
 
             %% Configure partisan dispatch in Riak Core.

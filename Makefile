@@ -29,6 +29,12 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
+bench: kill
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=disterl --case=bench_test
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan --case=bench_test
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_parallelism --case=bench_test
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_binary_padding --case=bench_test
+
 without-partisan-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=disterl
 
@@ -47,8 +53,11 @@ partisan-scale-test: clear-logs kill
 partisan-large-scale-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_large_scale
 
-partisan-with-binary-padding: kill
+partisan-with-binary-padding-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_binary_padding
+
+partisan-with-parallelism-test: kill
+	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_parallelism
 
 prod-release:
 	$(REBAR) as prod release
@@ -62,8 +71,11 @@ prod-console:
 clean:
 	$(REBAR) clean
 
+dialyzer:
+	$(REBAR) dialyzer
+
 test: kill release
-	$(REBAR) ct
+	$(REBAR) ct --readable=false -v
 
 devrel1:
 	$(REBAR) as dev1 release

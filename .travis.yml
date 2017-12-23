@@ -11,7 +11,8 @@ script:
   - make with-partisan-test
   - make scale-test
   - make partisan-scale-test
-  - make partisan-with-binary-padding
+  - make partisan-with-binary-padding-test
+  - make partisan-with-parallelism-test
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
