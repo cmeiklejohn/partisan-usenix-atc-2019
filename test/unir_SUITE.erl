@@ -158,6 +158,15 @@ bench_test(Config) ->
 
     ct:pal("Configuration: ~p", [Config]),
 
+    DataDir = proplists:get_value(data_dir, Config, ""),
+    RootPath = DataDir ++ "../../../../../",
+
+    %% Get the root directory.
+    RootCommand = "cd " ++ RootPath ++ "; pwd",
+    RootOutput = os:cmd(RootCommand),
+    RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
+    ct:pal("RootDir: ~p", [RootDir]),
+
     %% Configure parameters.
     ResultsFileParamters = case proplists:get_value(partisan_dispatch, Config, false) of
         true ->
@@ -170,9 +179,9 @@ bench_test(Config) ->
 
             Parallelism = case proplists:get_value(parallelism, Config, ?PARALLELISM) of
                 ?PARALLELISM ->
-                    "parallelism-1";
+                    "parallelism-" ++ integer_to_list(?PARALLELISM);
                 P ->
-                    "parallelism-5"
+                    "parallelism-" ++ integer_to_list(P)
             end,
 
             "partisan-" ++ BinaryPadding ++ "-" ++ Parallelism;
@@ -200,26 +209,31 @@ bench_test(Config) ->
     ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
 
     %% Configure bench paths.
-    BenchRoot = "/mnt/c/Users/chris/GitHub/unir/_checkouts/lasp_bench",
+    BenchDir = RootDir ++ "_build/default/lib/lasp_bench/",
 
     %% Build bench.
-    BuildCommand = "cd " ++ BenchRoot ++ "; make all",
+    BuildCommand = "cd " ++ BenchDir ++ "; make all",
     BuildOutput = os:cmd(BuildCommand),
     ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
 
     %% Run bench.
     SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
-    BenchCommand = "cd " ++ BenchRoot ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench examples/unir.config",
+    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/unir.config",
     BenchOutput = os:cmd(BenchCommand),
     ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
 
     %% Generate results.
-    ResultsCommand = "cd " ++ BenchRoot ++ "; make results",
+    ResultsCommand = "cd " ++ BenchDir ++ "; make results",
     ResultsOutput = os:cmd(ResultsCommand),
     ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
 
+    %% Make results dir.
+    DirCommand = "mkdir " ++ RootDir ++ "results/" ++ integer_to_list(Hash),
+    DirOutput = os:cmd(DirCommand),
+    ct:pal("~p => ~p", [DirCommand, DirOutput]),
+
     %% Copy results.
-    CopyCommand = "cd " ++ BenchRoot ++ "; cp tests/current/summary.png /mnt/c/Users/chris/OneDrive/Desktop/" ++ ResultsFile,
+    CopyCommand = "cd " ++ BenchDir ++ "; cp tests/current/summary.png " ++ RootDir ++ "results/" ++ integer_to_list(Hash) ++ "/" ++ ResultsFile,
     CopyOutput = os:cmd(CopyCommand),
     ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
 
@@ -533,7 +547,7 @@ vnode_test(Config) ->
     %% Attempt to access the vnode request API via FSM.
     ct:pal("Waiting for response from fsm command..."),
     FsmResult = rpc:call(Node1, unir, fsm_ping, []),
-    ?assertMatch({pong, _}, SyncSpawnCommandResult),
+    ?assertMatch({pong, _}, FsmResult),
 
     stop(Nodes),
 
@@ -701,7 +715,6 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
-            ok = rpc:call(Node, partisan_config, set, [parallelism, ?PARALLELISM]),
             ok = rpc:call(Node, partisan_config, set, [channels, ?CHANNELS]),
             ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
