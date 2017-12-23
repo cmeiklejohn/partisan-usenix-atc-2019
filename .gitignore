@@ -3,3 +3,4 @@ deps/
 .vscode/
 _checkouts/
 log/
+results/
