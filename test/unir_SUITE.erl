@@ -1222,5 +1222,5 @@ scale(Nodes) ->
 %% @private
 rand_bits(Bits) ->
         Bytes = (Bits + 7) div 8,
-        <<Result:Bits/bits, _/bits>> = crypto:rand_bytes(Bytes),
+        <<Result:Bits/bits, _/bits>> = crypto:strong_rand_bytes(Bytes),
         Result.
