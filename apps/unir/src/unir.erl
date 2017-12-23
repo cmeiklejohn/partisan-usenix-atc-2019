@@ -1,4 +1,6 @@
 -module(unir).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
