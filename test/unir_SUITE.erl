@@ -236,11 +236,11 @@ bench_test(Config) ->
     %% Copy results.
     case os:getenv("TRAVIS") of
         false ->
-            ok;
-        _ ->
             CopyCommand = "cd " ++ BenchDir ++ "; cp tests/current/summary.png " ++ RootDir ++ "results/" ++ integer_to_list(Hash) ++ "/" ++ ResultsFile,
             CopyOutput = os:cmd(CopyCommand),
-            ct:pal("~p => ~p", [CopyCommand, CopyOutput])
+            ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
+        _ ->
+            ok
     end,
 
     stop(Nodes),
