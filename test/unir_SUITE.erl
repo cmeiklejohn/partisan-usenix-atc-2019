@@ -100,11 +100,12 @@ groups() ->
        metadata_test, 
        large_gossip_test,
        timing_test,
+       bench_test,
        transition_test, 
        vnode_test]},
 
      {default, [],
-      [membership_test]
+      [bench_test]
      },
 
      {disterl, [],
@@ -140,6 +141,62 @@ groups() ->
 %% ===================================================================
 %% Tests.
 %% ===================================================================
+
+bench_test(Config) ->
+    Nodes = start(bench_test,
+                  Config,
+                  [{num_nodes, 3},
+                   {partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    ct:pal("Configuration: ~p", [Config]),
+
+    ResultsFile = case proplists:get_value(partisan_dispatch, Config, false) of
+        true ->
+            "partisan.png";
+        false ->
+            "disterl.png"
+    end,
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    %% Verify partisan connection is configured with the correct
+    %% membership information.
+    ct:pal("Waiting for partisan membership..."),
+    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
+
+    %% Ensure we have the right number of connections.
+    %% Verify appropriate number of connections.
+    ct:pal("Waiting for partisan connections..."),
+    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
+
+    %% Configure bench paths.
+    BenchRoot = "/mnt/c/Users/chris/GitHub/unir/_checkouts/lasp_bench",
+
+    %% Build bench.
+    BuildCommand = "cd " ++ BenchRoot ++ "; make all",
+    BuildOutput = os:cmd(BuildCommand),
+    ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
+
+    %% Run bench.
+    SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
+    BenchCommand = "cd " ++ BenchRoot ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench examples/unir.config",
+    BenchOutput = os:cmd(BenchCommand),
+    ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
+
+    %% Generate results.
+    ResultsCommand = "cd " ++ BenchRoot ++ "; make results",
+    ResultsOutput = os:cmd(ResultsCommand),
+    ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
+
+    %% Copy results.
+    CopyCommand = "cd " ++ BenchRoot ++ "; cp tests/current/summary.png /mnt/c/Users/chris/OneDrive/Desktop/" ++ ResultsFile,
+    CopyOutput = os:cmd(CopyCommand),
+    ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
+
+    stop(Nodes),
+
+    ok.
 
 timing_test(Config) ->
     Nodes = start(timing_test,
@@ -444,6 +501,11 @@ vnode_test(Config) ->
     SyncSpawnCommandResult = rpc:call(Node1, unir, sync_spawn_ping, []),
     ?assertMatch({pong, _}, SyncSpawnCommandResult),
 
+    %% Attempt to access the vnode request API via FSM.
+    ct:pal("Waiting for response from fsm command..."),
+    FsmResult = rpc:call(Node1, unir, fsm_ping, []),
+    ?assertMatch({pong, _}, SyncSpawnCommandResult),
+
     stop(Nodes),
 
     ok.
@@ -479,8 +541,9 @@ start(_Case, Config, Options) ->
     ct:pal("Launching Erlang distribution..."),
 
     os:cmd(os:find_executable("epmd") ++ " -daemon"),
-    {ok, Hostname} = inet:gethostname(),
-    case net_kernel:start([list_to_atom("runner@" ++ Hostname), shortnames]) of
+    %% {ok, Hostname} = inet:gethostname(),
+    Hostname = "127.0.0.1",
+    case net_kernel:start([list_to_atom("runner@" ++ Hostname), longnames]) of
         {ok, _} ->
             ok;
         {error, {already_started, _}} ->
@@ -511,6 +574,7 @@ start(_Case, Config, Options) ->
 
                             case ct_slave:start(Name, NodeConfig) of
                                 {ok, Node} ->
+                                    ct:pal("Node started: ~p", [Node]),
                                     {Name, Node};
                                 Error ->
                                     ct:fail(Error)
