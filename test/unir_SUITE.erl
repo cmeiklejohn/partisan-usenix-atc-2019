@@ -584,7 +584,6 @@ start(_Case, Config, Options) ->
     ct:pal("Launching Erlang distribution..."),
 
     os:cmd(os:find_executable("epmd") ++ " -daemon"),
-    %% {ok, Hostname} = inet:gethostname(),
     Hostname = "127.0.0.1",
     case net_kernel:start([list_to_atom("runner@" ++ Hostname), longnames]) of
         {ok, _} ->
@@ -611,7 +610,6 @@ start(_Case, Config, Options) ->
 
                             NodeConfig = [{monitor_master, true},
                                           {erl_flags, "-smp"}, %% smp for the eleveldb god
-
                                           {startup_functions,
                                            [{code, set_path, [codepath()]}]}],
 
@@ -1023,8 +1021,9 @@ del_all_files([Dir | T], EmptyDirs) ->
 verify_open_connections(Me, Others, Connections) ->
     %% Verify we have connections to the peers we should have.
     R = lists:map(fun(Other) ->
+                        Parallelism = rpc:call(Me, partisan_config, get, [parallelism, ?PARALLELISM]),
                         OtherName = rpc:call(Other, partisan_peer_service_manager, myself, []),
-                        DesiredConnections = ?PARALLELISM * (length(?CHANNELS) + 1),
+                        DesiredConnections = Parallelism * (length(?CHANNELS) + 1),
                         case dict:find(OtherName, Connections) of
                             {ok, Active} ->
                                 case length(Active) of
