@@ -7,7 +7,9 @@
          ping/0,
          sync_ping/0,
          sync_spawn_ping/0,
-         fsm_ping/0
+         fsm_ping/0,
+         fsm_get/1,
+         fsm_put/2
         ]).
 
 -ignore_xref([
@@ -47,6 +49,16 @@ sync_spawn_ping() ->
 %% @doc Pings a random vnode to make sure communication is functional
 fsm_ping() ->
     {ok, ReqId} = unir_ping_fsm:ping(),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Make a request through the put FSM.
+fsm_put(Key, Value) ->
+    {ok, ReqId} = unir_put_fsm:put(Key, Value),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Make a request through the get FSM.
+fsm_get(Key) ->
+    {ok, ReqId} = unir_get_fsm:get(Key),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %%%===================================================================

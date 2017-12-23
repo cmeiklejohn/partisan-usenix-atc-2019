@@ -28,4 +28,12 @@ init(_Args) ->
                {unir_ping_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [unir_ping_fsm_sup]},
 
-    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM]}}.
+    PutFSM = {unir_put_fsm_sup,
+              {unir_put_fsm_sup, start_link, []},
+               permanent, infinity, supervisor, [unir_put_fsm_sup]},
+
+    GetFSM = {unir_get_fsm_sup,
+              {unir_get_fsm_sup, start_link, []},
+               permanent, infinity, supervisor, [unir_get_fsm_sup]},
+
+    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM, PutFSM, GetFSM]}}.

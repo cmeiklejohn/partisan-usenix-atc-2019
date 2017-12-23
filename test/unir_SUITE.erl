@@ -103,6 +103,7 @@ groups() ->
        large_gossip_test,
        timing_test,
        bench_test,
+       get_put_test,
        transition_test, 
        vnode_test]},
 
@@ -410,6 +411,42 @@ metadata_test(Config) ->
 
     %% Verify that we can read that value at all nodes.
     ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
+
+    stop(Nodes),
+
+    ok.
+
+get_put_test(Config) ->
+    Nodes = start(get_put_test,
+                  Config,
+                  [{partisan_peer_service_manager,
+                    partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    Key = key,
+    Value = <<"binary">>,
+
+    %% Get first node.
+    Node = hd(SortedNodes),
+
+    %% Make get request.
+    case rpc:call(Node, unir, fsm_get, [Key]) of
+        {ok, _} ->
+            ok;
+        GetError ->
+            ct:pal("Get failed: ~p", [GetError]),
+            ct:fail({error, GetError})
+    end,
+
+    %% Make put request.
+    case rpc:call(Node, unir, fsm_put, [Key, Value]) of
+        {ok, _} ->
+            ok;
+        PutError ->
+            ct:pal("Put failed: ~p", [PutError]),
+            ct:fail({error, PutError})
+    end,
 
     stop(Nodes),
 

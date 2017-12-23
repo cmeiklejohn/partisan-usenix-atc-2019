@@ -1,9 +1,13 @@
 -module(unir_vnode).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
+
 -behaviour(riak_core_vnode).
 
 -export([start_vnode/1,
          init/1,
-         ping/2]).
+         ping/2,
+         put/4,
+         get/3]).
 
 -export([
          terminate/2,
@@ -25,7 +29,7 @@
              start_vnode/1
              ]).
 
--record(state, {partition}).
+-record(state, {partition, binary}).
 
 -define(MASTER, unir_vnode_master).
 
@@ -34,7 +38,20 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    {ok, #state {partition=Partition}}.
+    Binary = rand_bits(512),
+    {ok, #state {partition=Partition, binary=Binary}}.
+
+put(Preflist, Identity, Key, Value) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {put, Identity, Key, Value},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+get(Preflist, Identity, Key) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {get, Identity, Key},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 ping(Preflist, Identity) ->
     riak_core_vnode_master:command(Preflist,
@@ -42,7 +59,10 @@ ping(Preflist, Identity) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-%% Sample command: respond to a ping
+handle_command({put, {ReqId, _}, _Key, Value}, _Sender, State) ->
+    {reply, {ok, ReqId, Value}, State};
+handle_command({get, {ReqId, _}, Key}, _Sender, #state{binary=Value}=State) ->
+    {reply, {ok, ReqId, Value}, State};
 handle_command({ping, {ReqId, _}}, _Sender, State) ->
     {reply, {ok, ReqId}, State};
 handle_command(ping, _Sender, State) ->
@@ -89,3 +109,9 @@ handle_exit(_Pid, _Reason, State) ->
 
 terminate(_Reason, _State) ->
     ok.
+
+%% @private
+rand_bits(Bits) ->
+    Bytes = (Bits + 7) div 8,
+    <<Result:Bits/bits, _/bits>> = crypto:strong_rand_bytes(Bytes),
+    Result.
