@@ -60,8 +60,8 @@ ping(Preflist, Identity) ->
                                    ?MASTER).
 
 handle_command({put, {ReqId, _}, _Key, Value}, _Sender, State) ->
-    {reply, {ok, ReqId, Value}, State};
-handle_command({get, {ReqId, _}, Key}, _Sender, #state{binary=Value}=State) ->
+    {reply, {ok, ReqId, Value}, State#state{binary=Value}};
+handle_command({get, {ReqId, _}, _Key}, _Sender, #state{binary=Value}=State) ->
     {reply, {ok, ReqId, Value}, State};
 handle_command({ping, {ReqId, _}}, _Sender, State) ->
     {reply, {ok, ReqId}, State};
