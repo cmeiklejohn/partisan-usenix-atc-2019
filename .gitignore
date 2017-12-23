@@ -2,3 +2,4 @@ _build/
 deps/
 .vscode/
 _checkouts/
+log/
