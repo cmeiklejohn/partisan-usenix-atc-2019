@@ -158,13 +158,35 @@ bench_test(Config) ->
 
     ct:pal("Configuration: ~p", [Config]),
 
-    ResultsFile = case proplists:get_value(partisan_dispatch, Config, false) of
+    %% Configure parameters.
+    ResultsFileParamters = case proplists:get_value(partisan_dispatch, Config, false) of
         true ->
-            "partisan.png";
+            BinaryPadding = case proplists:get_value(binary_padding, Config, false) of
+                true ->
+                    "binary-padding";
+                false ->
+                    "no-binary-padding"
+            end,
+
+            Parallelism = case proplists:get_value(parallelism, Config, ?PARALLELISM) of
+                ?PARALLELISM ->
+                    "parallelism-1";
+                P ->
+                    "parallelism-5"
+            end,
+
+            "partisan-" ++ BinaryPadding ++ "-" ++ Parallelism;
         false ->
-            "disterl.png"
+            "disterl"
     end,
 
+    %% Get hash of execution.
+    Hash = proplists:get_value(hash, Config, 0),
+
+    %% Configure the results file.
+    ResultsFile = "bench-" ++ integer_to_list(Hash) ++ "-" ++ ResultsFileParamters ++ ".png",
+
+    %% Select the node configuration.
     SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
 
     %% Verify partisan connection is configured with the correct
