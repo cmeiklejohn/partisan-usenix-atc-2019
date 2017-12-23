@@ -3,6 +3,9 @@
 
 -export([start_vnode/1,
          init/1,
+         ping/2]).
+
+-export([
          terminate/2,
          handle_command/3,
          is_empty/1,
@@ -22,6 +25,8 @@
 
 -record(state, {partition}).
 
+-define(MASTER, unir_vnode_master).
+
 %% API
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
@@ -29,7 +34,15 @@ start_vnode(I) ->
 init([Partition]) ->
     {ok, #state {partition=Partition}}.
 
+ping(Preflist, Identity) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {ping, Identity},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
 %% Sample command: respond to a ping
+handle_command({ping, {ReqId, _}}, _Sender, State) ->
+    {reply, {ok, ReqId}, State};
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 handle_command(Message, _Sender, State) ->

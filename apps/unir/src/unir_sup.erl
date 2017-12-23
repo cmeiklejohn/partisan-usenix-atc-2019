@@ -24,5 +24,8 @@ init(_Args) ->
                {riak_core_vnode_master, start_link, [unir_vnode]},
                 permanent, 5000, worker, [riak_core_vnode_master]},
 
-    {ok,
-        {{one_for_one, 5, 10}, [VMaster]}}.
+    PingFSM = {unir_ping_fsm_sup,
+               {unir_ping_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [unir_ping_fsm_sup]},
+
+    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM]}}.
