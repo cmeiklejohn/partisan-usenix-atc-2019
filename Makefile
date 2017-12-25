@@ -28,12 +28,16 @@ logs:
 
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
-
+		
 bench: kill
-	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=disterl --case=bench_test
-	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan --case=bench_test
-	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_parallelism --case=bench_test
-	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=partisan_with_binary_padding --case=bench_test
+	@echo "Running Distributed Erlang benchmark with configuration $(BENCH_CONFIG)..."
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=disterl --case=bench_test
+	@echo "Running Partisan benchmark with configuration $(BENCH_CONFIG)..."
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=partisan --case=bench_test
+	@echo "Running Partisan (parallel) benchmark with configuration $(BENCH_CONFIG)..."
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=partisan_with_parallelism --case=bench_test
+	@echo "Running Partisan (binary padding) benchmark with configuration $(BENCH_CONFIG)..."
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=partisan_with_binary_padding --case=bench_test
 
 without-partisan-test: kill
 	$(REBAR) ct -v --readable=false --suite=unir_SUITE --group=disterl
