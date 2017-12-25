@@ -218,7 +218,7 @@ bench_test(Config) ->
     %% Run bench.
     ct:pal("Executing benchmark..."),
     SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
-    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/unir.config",
+    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/unir_basic.config",
     _BenchOutput = os:cmd(BenchCommand),
     % ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
 
