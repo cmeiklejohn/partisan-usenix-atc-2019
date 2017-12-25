@@ -83,9 +83,9 @@ init_per_group(partisan_scale, Config) ->
 init_per_group(partisan_large_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_with_binary_padding, Config) ->
-    [{partisan_dispatch, true}, {binary_padding, true}] ++ Config;
+    [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}, {binary_padding, true}] ++ Config;
 init_per_group(partisan_with_parallelism, Config) ->
-    [{partisan_dispatch, true}, {parallelism, 5}] ++ Config;
+    [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}, {parallelism, 5}] ++ Config;
 init_per_group(_, Config) ->
     Config.
 
