@@ -101,7 +101,6 @@ groups() ->
       [membership_test, 
        metadata_test, 
        large_gossip_test,
-       timing_test,
        bench_test,
        get_put_test,
        transition_test, 
@@ -138,12 +137,10 @@ groups() ->
       [large_scale_test]},
 
      {partisan_with_binary_padding, [],
-      [timing_test,
-       bench_test]},
+      [bench_test]},
 
      {partisan_with_parallelism, [],
-      [timing_test,
-       bench_test]}
+      [bench_test]}
     ].
 
 %% ===================================================================
@@ -242,77 +239,6 @@ bench_test(Config) ->
         _ ->
             ok
     end,
-
-    stop(Nodes),
-
-    ok.
-
-timing_test(Config) ->
-    Nodes = start(timing_test,
-                  Config,
-                  [{num_nodes, 3},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    %% Send a bunch of messages.
-    Self = self(),
-    NumMessages = 10000,
-    [Node1, Node2, _Node3] = SortedNodes,
-
-    %% Register a local name for forwarding.
-    Self = self(),
-    LocalName = test,
-
-    %% Use 64-byte binary to force shared heap usage.
-    Padding = rand_bits(512),
-
-    {Time, _} = timer:tc(fun() ->
-
-            %% Spawn receiver process on Node2.
-            ReceiverFun = fun() ->
-                receive
-                    {message, Padding, NumMessages} ->
-                        Self ! done
-                end
-            end,
-            ReceiverPid = rpc:call(Node2, erlang, spawn, [ReceiverFun]),
-
-            %% Register name on Node2.
-            true = rpc:call(Node2, erlang, register, [LocalName, ReceiverPid]),
-
-            %% Spawn senders on Node1.
-            ct:pal("Performing message dispatch."),
-            lists:foreach(fun(X) ->
-                spawn(fun() ->
-                    ok = rpc:call(Node1, 
-                                  riak_core_partisan_utils, 
-                                  forward, 
-                                  [vnode, Node2, LocalName, {message, Padding, X}])
-                    end)
-                end, lists:seq(1, NumMessages)),
-
-            %% Wait for receipt acknowledgement.
-            ct:pal("Waiting for receipt acknowledgement."),
-            receive
-                done ->
-                    ok
-            end
-
-        end),
-
-    ct:pal("Time for ~p messages: ~p", [NumMessages, Time]),
 
     stop(Nodes),
 
