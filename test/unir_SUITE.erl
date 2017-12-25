@@ -236,14 +236,14 @@ bench_test(Config) ->
             %% Make results dir.
             ct:pal("Making results output directory..."),
             DirCommand = "mkdir " ++ RootDir ++ "results/",
-            DirOutput = os:cmd(DirCommand),
-            ct:pal("~p => ~p", [DirCommand, DirOutput]),
+            _DirOutput = os:cmd(DirCommand),
+            % ct:pal("~p => ~p", [DirCommand, DirOutput]),
 
             %% Copy results.
             ct:pal("Copying results into output directory..."),
             CopyCommand = "cd " ++ BenchDir ++ "; cp -rpv tests/* " ++ RootDir ++ "results/",
-            CopyOutput = os:cmd(CopyCommand),
-            ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
+            _CopyOutput = os:cmd(CopyCommand);
+            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
         _ ->
             ok
     end,
