@@ -211,9 +211,11 @@ bench_test(Config) ->
     _BuildOutput = os:cmd(BuildCommand),
     % ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
 
+    %% Get benchmark configuration.
+    BenchConfig = ?config(bench_config, Config),
+
     %% Run bench.
     ct:pal("Executing benchmark..."),
-    BenchConfig = ?config(bench_config, Config),
     SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
     BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/" ++ BenchConfig,
     _BenchOutput = os:cmd(BenchCommand),
@@ -241,7 +243,7 @@ bench_test(Config) ->
 
             %% Get directory name.
             Directory = string:substr(FullResultsPath, string:rstr(FullResultsPath, "/") + 1, length(FullResultsPath)),
-            ResultsDirectory = Directory ++ "-" ++ ResultsParameters,
+            ResultsDirectory = Directory ++ "-" ++ BenchConfig ++ "-" ++ ResultsParameters,
 
             %% Copy results.
             ct:pal("Copying results into output directory: ~p", [ResultsDirectory]),
