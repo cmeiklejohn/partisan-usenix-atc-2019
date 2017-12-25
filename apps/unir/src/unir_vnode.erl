@@ -9,8 +9,7 @@
          put/4,
          get/3]).
 
--export([
-         terminate/2,
+-export([terminate/2,
          handle_command/3,
          is_empty/1,
          delete/1,
@@ -25,9 +24,7 @@
          handle_coverage/4,
          handle_exit/3]).
 
--ignore_xref([
-             start_vnode/1
-             ]).
+-ignore_xref([start_vnode/1]).
 
 -record(state, {partition, binary}).
 
