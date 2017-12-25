@@ -87,7 +87,7 @@ init_per_group(partisan_with_binary_padding, Config) ->
 init_per_group(partisan_with_parallelism, Config) ->
     [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}, {parallelism, 5}] ++ Config;
 init_per_group(_, Config) ->
-    Config.
+    [{bench_config, "unir_basic.config"}] ++ Config.
 
 end_per_group(_, _Config) ->
     ok.
@@ -235,15 +235,15 @@ bench_test(Config) ->
         false ->
             %% Make results dir.
             ct:pal("Making results output directory..."),
-            DirCommand = "mkdir " ++ RootDir ++ "results/" ++ integer_to_list(Hash),
-            _DirOutput = os:cmd(DirCommand),
-            % ct:pal("~p => ~p", [DirCommand, DirOutput]),
+            DirCommand = "mkdir " ++ RootDir ++ "results/",
+            DirOutput = os:cmd(DirCommand),
+            ct:pal("~p => ~p", [DirCommand, DirOutput]),
 
             %% Copy results.
             ct:pal("Copying results into output directory..."),
-            CopyCommand = "cd " ++ BenchDir ++ "; cp tests/current/summary.png " ++ RootDir ++ "results/" ++ integer_to_list(Hash) ++ "/" ++ ResultsFile,
-            _CopyOutput = os:cmd(CopyCommand);
-            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
+            CopyCommand = "cd " ++ BenchDir ++ "; cp -rpv tests/* " ++ RootDir ++ "results/",
+            CopyOutput = os:cmd(CopyCommand),
+            ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
         _ ->
             ok
     end,
