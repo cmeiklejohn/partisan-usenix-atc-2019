@@ -210,32 +210,37 @@ bench_test(Config) ->
     BenchDir = RootDir ++ "_build/default/lib/lasp_bench/",
 
     %% Build bench.
+    ct:pal("Building benchmarking suite..."),
     BuildCommand = "cd " ++ BenchDir ++ "; make all",
-    BuildOutput = os:cmd(BuildCommand),
-    ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
+    _BuildOutput = os:cmd(BuildCommand),
+    % ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
 
     %% Run bench.
+    ct:pal("Executing benchmark..."),
     SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
     BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/unir.config",
-    BenchOutput = os:cmd(BenchCommand),
-    ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
+    _BenchOutput = os:cmd(BenchCommand),
+    % ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
 
     %% Generate results.
+    ct:pal("Generating results..."),
     ResultsCommand = "cd " ++ BenchDir ++ "; make results",
-    ResultsOutput = os:cmd(ResultsCommand),
-    ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
+    _ResultsOutput = os:cmd(ResultsCommand),
+    % ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
 
-    %% Copy results.
     case os:getenv("TRAVIS") of
         false ->
             %% Make results dir.
+            ct:pal("Making results output directory..."),
             DirCommand = "mkdir " ++ RootDir ++ "results/" ++ integer_to_list(Hash),
-            DirOutput = os:cmd(DirCommand),
-            ct:pal("~p => ~p", [DirCommand, DirOutput]),
+            _DirOutput = os:cmd(DirCommand),
+            % ct:pal("~p => ~p", [DirCommand, DirOutput]),
 
+            %% Copy results.
+            ct:pal("Copying results into output directory..."),
             CopyCommand = "cd " ++ BenchDir ++ "; cp tests/current/summary.png " ++ RootDir ++ "results/" ++ integer_to_list(Hash) ++ "/" ++ ResultsFile,
-            CopyOutput = os:cmd(CopyCommand),
-            ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
+            _CopyOutput = os:cmd(CopyCommand);
+            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
         _ ->
             ok
     end,
