@@ -228,14 +228,14 @@ bench_test(Config) ->
     ResultsOutput = os:cmd(ResultsCommand),
     ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
 
-    %% Make results dir.
-    DirCommand = "mkdir " ++ RootDir ++ "results/" ++ integer_to_list(Hash),
-    DirOutput = os:cmd(DirCommand),
-    ct:pal("~p => ~p", [DirCommand, DirOutput]),
-
     %% Copy results.
     case os:getenv("TRAVIS") of
         false ->
+            %% Make results dir.
+            DirCommand = "mkdir " ++ RootDir ++ "results/" ++ integer_to_list(Hash),
+            DirOutput = os:cmd(DirCommand),
+            ct:pal("~p => ~p", [DirCommand, DirOutput]),
+
             CopyCommand = "cd " ++ BenchDir ++ "; cp tests/current/summary.png " ++ RootDir ++ "results/" ++ integer_to_list(Hash) ++ "/" ++ ResultsFile,
             CopyOutput = os:cmd(CopyCommand),
             ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
