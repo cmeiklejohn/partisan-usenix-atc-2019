@@ -100,7 +100,7 @@ groups() ->
      {basic, [],
       [membership_test, 
        metadata_test, 
-       large_gossip_test,
+       %% large_gossip_test,
        bench_test,
        get_put_test,
        transition_test, 
