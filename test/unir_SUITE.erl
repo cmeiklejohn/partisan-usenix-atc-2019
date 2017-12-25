@@ -72,15 +72,6 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
-bench_config() ->
-    case os:getenv("BENCH_CONFIG", false) of
-        false ->
-            [{bench_config, "unir_basic.config"}];
-        Config ->
-            ct:pal("Using alternative bench config: ~p", [Config]),
-            [{bench_config, Config}]
-    end.
-
 init_per_group(disterl, Config) ->
     bench_config() ++ Config;
 init_per_group(partisan, Config) ->
@@ -177,7 +168,7 @@ bench_test(Config) ->
     ct:pal("RootDir: ~p", [RootDir]),
 
     %% Configure parameters.
-    ResultsFileParamters = case proplists:get_value(partisan_dispatch, Config, false) of
+    ResultsParameters = case proplists:get_value(partisan_dispatch, Config, false) of
         true ->
             BinaryPadding = case proplists:get_value(binary_padding, Config, false) of
                 true ->
@@ -197,12 +188,6 @@ bench_test(Config) ->
         false ->
             "disterl"
     end,
-
-    %% Get hash of execution.
-    Hash = proplists:get_value(hash, Config, 0),
-
-    %% Configure the results file.
-    ResultsFile = "bench-" ++ integer_to_list(Hash) ++ "-" ++ ResultsFileParamters ++ ".png",
 
     %% Select the node configuration.
     SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
@@ -248,9 +233,19 @@ bench_test(Config) ->
             _DirOutput = os:cmd(DirCommand),
             % ct:pal("~p => ~p", [DirCommand, DirOutput]),
 
+            %% Get full path to the results.
+            ReadLinkCommand = "readlink " ++ BenchDir ++ "tests/current",
+            ReadLinkOutput = os:cmd(ReadLinkCommand),
+            FullResultsPath = string:substr(ReadLinkOutput, 1, length(ReadLinkOutput) - 1),
+            ct:pal("~p => ~p", [ReadLinkCommand, ReadLinkOutput]),
+
+            %% Get directory name.
+            Directory = string:substr(FullResultsPath, string:rstr(FullResultsPath, "/") + 1, length(FullResultsPath)),
+            ResultsDirectory = Directory ++ "-" ++ ResultsParameters,
+
             %% Copy results.
-            ct:pal("Copying results into output directory..."),
-            CopyCommand = "cd " ++ BenchDir ++ "; cp -rpv tests/* " ++ RootDir ++ "results/",
+            ct:pal("Copying results into output directory: ~p", [ResultsDirectory]),
+            CopyCommand = "cp -rpv " ++ FullResultsPath ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
             _CopyOutput = os:cmd(CopyCommand);
             % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
         _ ->
@@ -1169,3 +1164,21 @@ rand_bits(Bits) ->
         Bytes = (Bits + 7) div 8,
         <<Result:Bits/bits, _/bits>> = crypto:strong_rand_bytes(Bytes),
         Result.
+
+%% @private
+default_bench_configuration() ->
+    [{bench_config, "unir_basic.config"}].
+
+%% @private
+bench_config() ->
+    case os:getenv("BENCH_CONFIG", "") of
+        false ->
+            ct:pal("Bench configuration not specified, using default."),
+            default_bench_configuration();
+        "" ->
+            ct:pal("Bench configuration null, using default."),
+            default_bench_configuration();
+        Config ->
+            ct:pal("Using alternative bench config: ~p", [Config]),
+            [{bench_config, Config}]
+    end.
