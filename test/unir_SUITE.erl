@@ -72,10 +72,19 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
+bench_config() ->
+    case os:getenv("BENCH_CONFIG", false) of
+        false ->
+            [{bench_config, "unir_basic.config"}];
+        Config ->
+            ct:pal("Using alternative bench config: ~p", [Config]),
+            [{bench_config, Config}]
+    end.
+
 init_per_group(disterl, Config) ->
-    [{bench_config, "unir_basic.config"}] ++ Config;
+    bench_config() ++ Config;
 init_per_group(partisan, Config) ->
-    [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}] ++ Config;
+    bench_config() ++ [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_races, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_scale, Config) ->
@@ -83,11 +92,11 @@ init_per_group(partisan_scale, Config) ->
 init_per_group(partisan_large_scale, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_with_binary_padding, Config) ->
-    [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}, {binary_padding, true}] ++ Config;
+    bench_config() ++ [{partisan_dispatch, true}, {binary_padding, true}] ++ Config;
 init_per_group(partisan_with_parallelism, Config) ->
-    [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}, {parallelism, 5}] ++ Config;
+    bench_config() ++ [{partisan_dispatch, true}, {parallelism, 5}] ++ Config;
 init_per_group(_, Config) ->
-    [{bench_config, "unir_basic.config"}] ++ Config.
+    bench_config() ++ Config.
 
 end_per_group(_, _Config) ->
     ok.
