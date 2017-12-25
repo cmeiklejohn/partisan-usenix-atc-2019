@@ -515,7 +515,7 @@ vnode_test(Config) ->
     %% Attempt to access the vnode request API via FSM.
     ct:pal("Waiting for response from fsm command..."),
     FsmResult = rpc:call(Node1, unir, fsm_ping, []),
-    ?assertMatch({pong, _}, FsmResult),
+    ?assertMatch(ok, FsmResult),
 
     stop(Nodes),
 
