@@ -72,8 +72,10 @@ end_per_testcase(Case, Config) ->
     ct:pal("Ending test case ~p", [Case]),
     Config.
 
+init_per_group(disterl, Config) ->
+    [{bench_config, "unir_basic.config"}] ++ Config;
 init_per_group(partisan, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
+    [{bench_config, "unir_basic.config"}, {partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_races, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 init_per_group(partisan_scale, Config) ->
@@ -217,8 +219,9 @@ bench_test(Config) ->
 
     %% Run bench.
     ct:pal("Executing benchmark..."),
+    BenchConfig = ?config(bench_config, Config),
     SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
-    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/unir_basic.config",
+    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/" ++ BenchConfig,
     _BenchOutput = os:cmd(BenchCommand),
     % ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
 
