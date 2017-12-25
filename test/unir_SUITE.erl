@@ -609,6 +609,8 @@ stop(Nodes) ->
                 ok;
             {error, stop_timeout, _} ->
                 ok;
+            {error, not_started, _} ->
+                ok;
             Error ->
                 ct:fail(Error)
         end
