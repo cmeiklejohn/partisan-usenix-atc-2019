@@ -1169,7 +1169,7 @@ rand_bits(Bits) ->
 
 %% @private
 default_bench_configuration() ->
-    [{bench_config, "unir_1kb_object.config"}].
+    [{bench_config, "unir_default.config"}].
 
 %% @private
 bench_config() ->
