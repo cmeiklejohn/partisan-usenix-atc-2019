@@ -34,6 +34,8 @@ bench: kill
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=disterl --case=bench_test
 	@echo "Running Partisan benchmark with configuration $(BENCH_CONFIG)..."
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=partisan --case=bench_test
+
+extended-bench: kill bench
 	@echo "Running Partisan (parallel) benchmark with configuration $(BENCH_CONFIG)..."
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=unir_SUITE --group=partisan_with_parallelism --case=bench_test
 	@echo "Running Partisan (binary padding) benchmark with configuration $(BENCH_CONFIG)..."
