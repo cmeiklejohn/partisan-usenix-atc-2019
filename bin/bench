@@ -1,7 +1,5 @@
 #!/bin/bash
 
-rm -rf results/*
-
 for i in {1..10}
 do
     BENCH_CONFIG=unir_1kb_object.config make bench
