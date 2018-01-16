@@ -9,6 +9,7 @@
                   stdlib,
                   sasl,
                   riak_core,
+                  partisan,
                   setup
                  ]},
   {mod, { unir_app, []}},
