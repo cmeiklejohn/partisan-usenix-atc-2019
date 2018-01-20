@@ -1,0 +1,6 @@
+#!/bin/sh
+
+rm -rf _checkouts
+git clone git@github.com:lasp-lang/partisan _checkouts/partisan
+git clone git@github.com:lasp-lang/riak_core -b partisan-support _checkouts/riak_core
+git clone git@github.com:lasp-lang/riak_core_partisan_utils _checkouts/riak_core_partisan_utils
