@@ -44,8 +44,10 @@
 -define(PEER_PORT, 9000).
 -define(SLEEP, 30000).
 -define(PARALLELISM, 1).
+-define(GET_REQUEST, fsm_get).
+-define(PUT_REQUEST, fsm_put).
 
--define(PREFIX, {unir, test}).
+-define(PREFIX, {?APP, test}).
 -define(KEY, key).
 -define(VALUE, value).
 
@@ -376,7 +378,7 @@ get_put_test(Config) ->
     Node = hd(SortedNodes),
 
     %% Make get request.
-    case rpc:call(Node, unir, fsm_get, [Key]) of
+    case rpc:call(Node, ?APP, ?GET_REQUEST, [Key]) of
         {ok, _} ->
             ok;
         GetError ->
@@ -385,7 +387,7 @@ get_put_test(Config) ->
     end,
 
     %% Make put request.
-    case rpc:call(Node, unir, fsm_put, [Key, Value]) of
+    case rpc:call(Node, ?APP, ?PUT_REQUEST, [Key, Value]) of
         {ok, _} ->
             ok;
         PutError ->
@@ -511,24 +513,24 @@ vnode_test(Config) ->
     %% Attempt to access the vnode request API.
     %% This will test command/3 and command/4 behavior.
     ct:pal("Waiting for response from ping command..."),
-    CommandResult = rpc:call(Node1, unir, ping, []),
+    CommandResult = rpc:call(Node1, ?APP, ping, []),
     ?assertEqual(ok, CommandResult),
 
     %% Attempt to access the vnode request API.
     %% This will test sync_command/3 and sync_command/4 behavior.
     ct:pal("Waiting for response from sync_ping command..."),
-    SyncCommandResult = rpc:call(Node1, unir, sync_ping, []),
+    SyncCommandResult = rpc:call(Node1, ?APP, sync_ping, []),
     ?assertMatch({pong, _}, SyncCommandResult),
 
     %% Attempt to access the vnode request API.
     %% This will test sync_spawn_command/3 and sync_spawn_command/4 behavior.
     ct:pal("Waiting for response from sync_spawn_ping command..."),
-    SyncSpawnCommandResult = rpc:call(Node1, unir, sync_spawn_ping, []),
+    SyncSpawnCommandResult = rpc:call(Node1, ?APP, sync_spawn_ping, []),
     ?assertMatch({pong, _}, SyncSpawnCommandResult),
 
     %% Attempt to access the vnode request API via FSM.
     ct:pal("Waiting for response from fsm command..."),
-    FsmResult = rpc:call(Node1, unir, fsm_ping, []),
+    FsmResult = rpc:call(Node1, ?APP, fsm_ping, []),
     ?assertMatch(ok, FsmResult),
 
     stop(Nodes),
@@ -723,7 +725,7 @@ start(_Case, Config, Options) ->
                                 ct:fail(riak_core_failure)
                         end,
 
-                        %% Start unir.
+                        %% Start app.
                         {ok, _}  = rpc:call(Node,
                                             application, ensure_all_started,
                                             [?APP]),
