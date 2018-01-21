@@ -104,11 +104,13 @@ groups() ->
      {basic, [],
       [membership_test, 
        metadata_test, 
-       %% large_gossip_test,
        bench_test,
        get_put_test,
-       %% transition_test, %% TODO: Fix me.
        vnode_test]},
+
+     {failures, [],
+      [large_gossip_test,
+       transition_test]},
 
      {default, [],
       [bench_test]
@@ -550,6 +552,7 @@ stop(Nodes) ->
             {ok, _} ->
                 ok;
             {error, stop_timeout, _} ->
+                ct:pal("Stop failed for node: ~p", [Name]),
                 ok;
             {error, not_started, _} ->
                 ok;
