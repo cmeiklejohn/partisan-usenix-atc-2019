@@ -643,7 +643,7 @@ start(_Case, Config, Options) ->
                             filelib:ensure_dir(PlatformDir),
                             filelib:ensure_dir(RingDir),
 
-                            ok = rpc:call(Node, application, set_env, [riak_core, cluster_name, "unir"]),
+                            ok = rpc:call(Node, application, set_env, [riak_core, cluster_name, atom_to_list(?APP)]),
                             ok = rpc:call(Node, application, set_env, [riak_core, riak_state_dir, RingDir]),
                             ok = rpc:call(Node, application, set_env, [riak_core, ring_creation_size, NumberOfVNodes]),
 
@@ -651,7 +651,7 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_ip, "127.0.0.1"]),
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_port, web_ports(Name) + 3]),
 
-                            ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, ["../../../../_build/default/rel/unir/share/schema/"]]),
+                            ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, ["../../../../_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/"]]),
 
                             ok = rpc:call(Node, application, set_env, [riak_api, pb_port, web_ports(Name) + 2]),
                             ok = rpc:call(Node, application, set_env, [riak_api, pb_ip, "127.0.0.1"])
