@@ -75,19 +75,23 @@ end_per_testcase(Case, Config) ->
     Config.
 
 init_per_group(disterl, Config) ->
-    bench_config() ++ Config;
+    init_per_group(undefined, Config);
+
 init_per_group(partisan, Config) ->
-    bench_config() ++ [{partisan_dispatch, true}] ++ Config;
+    [{partisan_dispatch, true}] ++ init_per_group(undefined, Config);
+
 init_per_group(partisan_races, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
+    init_per_group(partisan, Config);
 init_per_group(partisan_scale, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
+    init_per_group(partisan, Config);
 init_per_group(partisan_large_scale, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
-init_per_group(partisan_with_binary_padding, Config) ->
-    bench_config() ++ [{partisan_dispatch, true}, {binary_padding, true}] ++ Config;
+    init_per_group(partisan, Config);
+
 init_per_group(partisan_with_parallelism, Config) ->
-    bench_config() ++ [{partisan_dispatch, true}, {parallelism, 5}] ++ Config;
+    [{parallelism, 5}] ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_binary_padding, Config) ->
+    [{binary_padding, true}] ++ init_per_group(partisan, Config);
+
 init_per_group(_, Config) ->
     bench_config() ++ Config.
 
