@@ -19,20 +19,9 @@
 %% -------------------------------------------------------------------
 %%
 
--module(throughput_SUITE).
+-module(support).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
-%% common_test callbacks
--export([suite/0,
-         init_per_suite/1,
-         end_per_suite/1,
-         init_per_testcase/2,
-         end_per_testcase/2,
-         all/0,
-         groups/0,
-         init_per_group/2]).
-
-%% tests
 -compile([export_all]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -40,526 +29,15 @@
 -include_lib("kernel/include/inet.hrl").
 
 -define(APP, unir).
--define(CLIENT_NUMBER, 3).
--define(PEER_PORT, 9000).
+
 -define(SLEEP, 30000).
--define(PARALLELISM, 1).
--define(GET_REQUEST, fsm_get).
--define(PUT_REQUEST, fsm_put).
 
--define(PREFIX, {?APP, test}).
--define(KEY, key).
--define(VALUE, value).
+-define(DEFAULT_PARALLELISM, 1).
+-define(DEFAULT_CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
 
--define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
-
-%% ===================================================================
-%% common_test callbacks
-%% ===================================================================
-
-suite() ->
-    [{timetrap, {hours, 10}}].
-
-init_per_suite(_Config) ->
-    _Config.
-
-end_per_suite(_Config) ->
-    _Config.
-
-init_per_testcase(Case, Config) ->
-    ct:pal("Beginning test case ~p", [Case]),
-    [{hash, erlang:phash2({Case, Config})}|Config].
-
-end_per_testcase(Case, Config) ->
-    ct:pal("Ending test case ~p", [Case]),
-    Config.
-
-init_per_group(disterl, Config) ->
-    Config;
-
-init_per_group(partisan, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
-
-init_per_group(partisan_races, Config) ->
-    init_per_group(partisan, Config);
-init_per_group(partisan_scale, Config) ->
-    init_per_group(partisan, Config);
-init_per_group(partisan_large_scale, Config) ->
-    init_per_group(partisan, Config);
-
-init_per_group(partisan_with_parallelism, Config) ->
-    [{parallelism, 5}] ++ init_per_group(partisan, Config);
-init_per_group(partisan_with_binary_padding, Config) ->
-    [{binary_padding, true}] ++ init_per_group(partisan, Config);
-init_per_group(partisan_with_vnode_partitioning, Config) ->
-    [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
-
-init_per_group(bench, Config) ->
-    bench_config() ++ Config;
-
-init_per_group(_, Config) ->
-    Config.
-
-end_per_group(_, _Config) ->
-    ok.
-
-all() ->
-    [
-     {group, default, []}
-    ].
-
-groups() ->
-    [
-     {basic, [],
-      [membership_test, 
-       metadata_test, 
-       get_put_test,
-       vnode_test,
-       {group, bench}]},
-
-     {bench, [],
-      [bench_test]},
-
-     {failures, [],
-      [large_gossip_test,
-       transition_test]},
-
-     {default, [],
-      [{group, bench}]
-     },
-
-     {disterl, [],
-      [{group, basic}]
-     },
-     
-     {partisan, [],
-      [{group, basic}]
-     },
-
-     {races, [],
-      [four_node_membership_test]},
-
-     {partisan_races, [],
-      [four_node_membership_test]},
-
-     {scale, [],
-      [scale_test]},
-
-     {partisan_scale, [],
-      [scale_test]},
-     
-     {large_scale, [],
-      [large_scale_test]},
-
-     {partisan_large_scale, [],
-      [large_scale_test]},
-
-     {partisan_with_parallelism, [],
-      [{group, bench}]},
-
-     {partisan_with_binary_padding, [],
-      [{group, bench}]},
-
-     {partisan_with_vnode_partitioning, [],
-      [{group, bench}]}
-    ].
-
-%% ===================================================================
-%% Tests.
-%% ===================================================================
-
-bench_test(Config) ->
-    Nodes = start(bench_test,
-                  Config,
-                  [{num_nodes, 3},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    ct:pal("Configuration: ~p", [Config]),
-
-    DataDir = proplists:get_value(data_dir, Config, ""),
-    RootPath = DataDir ++ "../../../../../",
-
-    %% Get the root directory.
-    RootCommand = "cd " ++ RootPath ++ "; pwd",
-    RootOutput = os:cmd(RootCommand),
-    RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
-    ct:pal("RootDir: ~p", [RootDir]),
-
-    %% Configure parameters.
-    ResultsParameters = case proplists:get_value(partisan_dispatch, Config, false) of
-        true ->
-            BinaryPadding = case proplists:get_value(binary_padding, Config, false) of
-                true ->
-                    "binary-padding";
-                false ->
-                    "no-binary-padding"
-            end,
-
-            VnodePartitioning = case proplists:get_value(vnode_partitioning, Config, false) of
-                true ->
-                    "vnode-partitioning";
-                false ->
-                    "no-vnode-partitioning"
-            end,
-
-            Parallelism = case proplists:get_value(parallelism, Config, ?PARALLELISM) of
-                ?PARALLELISM ->
-                    "parallelism-" ++ integer_to_list(?PARALLELISM);
-                P ->
-                    "parallelism-" ++ integer_to_list(P)
-            end,
-
-            "partisan-" ++ BinaryPadding ++ "-" ++ VnodePartitioning ++ "-" ++ Parallelism;
-        false ->
-            "disterl"
-    end,
-
-    %% Select the node configuration.
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    %% Configure bench paths.
-    BenchDir = RootDir ++ "_build/default/lib/lasp_bench/",
-
-    %% Build bench.
-    ct:pal("Building benchmarking suite..."),
-    BuildCommand = "cd " ++ BenchDir ++ "; make all",
-    _BuildOutput = os:cmd(BuildCommand),
-    % ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
-
-    %% Get benchmark configuration.
-    BenchConfig = ?config(bench_config, Config),
-
-    %% Run bench.
-    ct:pal("Executing benchmark..."),
-    SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
-    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/" ++ BenchConfig,
-    _BenchOutput = os:cmd(BenchCommand),
-    % ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
-
-    %% Generate results.
-    ct:pal("Generating results..."),
-    ResultsCommand = "cd " ++ BenchDir ++ "; make results",
-    _ResultsOutput = os:cmd(ResultsCommand),
-    % ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
-
-    case os:getenv("TRAVIS") of
-        false ->
-            %% Make results dir.
-            ct:pal("Making results output directory..."),
-            DirCommand = "mkdir " ++ RootDir ++ "results/",
-            _DirOutput = os:cmd(DirCommand),
-            % ct:pal("~p => ~p", [DirCommand, DirOutput]),
-
-            %% Get full path to the results.
-            ReadLinkCommand = "readlink " ++ BenchDir ++ "tests/current",
-            ReadLinkOutput = os:cmd(ReadLinkCommand),
-            FullResultsPath = string:substr(ReadLinkOutput, 1, length(ReadLinkOutput) - 1),
-            ct:pal("~p => ~p", [ReadLinkCommand, ReadLinkOutput]),
-
-            %% Get directory name.
-            Directory = string:substr(FullResultsPath, string:rstr(FullResultsPath, "/") + 1, length(FullResultsPath)),
-            ResultsDirectory = Directory ++ "-" ++ BenchConfig ++ "-" ++ ResultsParameters,
-
-            %% Copy results.
-            ct:pal("Copying results into output directory: ~p", [ResultsDirectory]),
-            CopyCommand = "cp -rpv " ++ FullResultsPath ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
-            _CopyOutput = os:cmd(CopyCommand);
-            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
-        _ ->
-            ok
-    end,
-
-    stop(Nodes),
-
-    ok.
-
-large_scale_test(Config) ->
-    case os:getenv("TRAVIS") of
-        "true" ->
-            Nodes = start(large_scale_test,
-                          Config,
-                          [{partisan_peer_service_manager,
-                              partisan_default_peer_service_manager},
-                          {num_nodes, 20},
-                          {cluster_nodes, false}]),
-
-            scale(Nodes);
-        _ ->
-            ct:pal("Skipping test; outside of the travis environment.")
-    end,
-
-    ok.
-
-scale_test(Config) ->
-    Nodes = start(scale_test,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager},
-                   {num_nodes, 10},
-                   {cluster_nodes, false}]),
-
-    scale(Nodes),
-
-    ok.
-
-transition_test(Config) ->
-    Nodes = start(transition_test,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager},
-                   {num_nodes, 4},
-                   {cluster_nodes, false}]),
-
-    %% Get the list of nodes.
-    [{_, Node1}, {_, Node2}, {_, Node3}, {_, Node4}] = Nodes,
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Cluster the first two ndoes.
-    ?assertEqual(ok, join_cluster([Node1, Node2])),
-
-    %% Verify appropriate number of connections.
-    ?assertEqual(ok, wait_until_all_connections([Node1, Node2])),
-
-    %% Perform metadata storage write.
-    ?assertEqual(ok, metadata_write(Node1)),
-
-    %% Join the third node.
-    ?assertEqual(ok, staged_join(Node3, Node1)),
-
-    %% Plan will only succeed once the ring has been gossiped.
-    ?assertEqual(ok, plan_and_commit(Node1)),
-
-    %% Verify appropriate number of connections.
-    ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3])),
-
-    %% Join the fourth node.
-    ?assertEqual(ok, staged_join(Node4, Node1)),
-
-    %% Plan will only succeed once the ring has been gossiped.
-    ?assertEqual(ok, plan_and_commit(Node1)),
-
-    %% Verify appropriate number of connections.
-    ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node3, Node4])),
-
-    %% Verify that we can read that value at all nodes.
-    ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
-
-    %% Leave a node.
-    ?assertEqual(ok, leave(Node3)),
-
-    %% Verify appropriate number of connections.
-    ?assertEqual(ok, wait_until_all_connections([Node1, Node2, Node4])),
-
-    stop(Nodes),
-
-    ok.
-
-metadata_test(Config) ->
-    Nodes = start(metadata_test,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Get the first node.
-    [{_Name, Node}|_] = Nodes,
-
-    %% Put a value into the metadata system.
-    ?assertEqual(ok, metadata_write(Node)),
-
-    %% Verify that we can read that value at all nodes.
-    ?assertEqual(ok, wait_until_metadata_read(SortedNodes)),
-
-    stop(Nodes),
-
-    ok.
-
-get_put_test(Config) ->
-    Nodes = start(get_put_test,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    Key = key,
-    Value = <<"binary">>,
-
-    %% Get first node.
-    Node = hd(SortedNodes),
-
-    %% Make get request.
-    case rpc:call(Node, ?APP, ?GET_REQUEST, [Key]) of
-        {ok, _} ->
-            ok;
-        GetError ->
-            ct:pal("Get failed: ~p", [GetError]),
-            ct:fail({error, GetError})
-    end,
-
-    %% Make put request.
-    case rpc:call(Node, ?APP, ?PUT_REQUEST, [Key, Value]) of
-        {ok, _} ->
-            ok;
-        PutError ->
-            ct:pal("Put failed: ~p", [PutError]),
-            ct:fail({error, PutError})
-    end,
-
-    stop(Nodes),
-
-    ok.
-
-four_node_membership_test(Config) ->
-    Nodes = start(four_node_membership_test,
-                  Config,
-                  [{num_nodes, 4},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    stop(Nodes),
-
-    ok.
-
-large_gossip_test(Config) ->
-    Nodes = start(large_gossip_test,
-                  Config,
-                  [{num_nodes, 5},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    %% Bloat ring.
-    ct:pal("Attempting to bloat the ring to see performance effect..."),
-    Node1 = hd(SortedNodes),
-    ok = rpc:call(Node1, riak_core_ring_manager, bloat_ring, []),
-
-    %% Sleep for gossip rounds.
-    ct:pal("Sleeping for 50 seconds..."),
-    timer:sleep(50000),
-
-    stop(Nodes),
-
-    ok.
-
-membership_test(Config) ->
-    Nodes = start(membership_test,
-                  Config,
-                  [{num_nodes, 3},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    stop(Nodes),
-
-    ok.
-
-join_test(Config) ->
-    Nodes = start(join_test,
-                  Config,
-                  [{num_nodes, 3},
-                   {partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    stop(Nodes),
-
-    ok.
-
-vnode_test(Config) ->
-    Nodes = start(vnode_test,
-                  Config,
-                  [{partisan_peer_service_manager,
-                    partisan_default_peer_service_manager}]),
-
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, wait_until_all_connections(SortedNodes)),
-
-    %% Get the list of nodes.
-    ct:pal("Nodes is: ~p", [Nodes]),
-    [{_, Node1}, {_, _Node2}, {_, _Node3}] = Nodes,
-
-    %% Attempt to access the vnode request API.
-    %% This will test command/3 and command/4 behavior.
-    ct:pal("Waiting for response from ping command..."),
-    CommandResult = rpc:call(Node1, ?APP, ping, []),
-    ?assertEqual(ok, CommandResult),
-
-    %% Attempt to access the vnode request API.
-    %% This will test sync_command/3 and sync_command/4 behavior.
-    ct:pal("Waiting for response from sync_ping command..."),
-    SyncCommandResult = rpc:call(Node1, ?APP, sync_ping, []),
-    ?assertMatch({pong, _}, SyncCommandResult),
-
-    %% Attempt to access the vnode request API.
-    %% This will test sync_spawn_command/3 and sync_spawn_command/4 behavior.
-    ct:pal("Waiting for response from sync_spawn_ping command..."),
-    SyncSpawnCommandResult = rpc:call(Node1, ?APP, sync_spawn_ping, []),
-    ?assertMatch({pong, _}, SyncSpawnCommandResult),
-
-    %% Attempt to access the vnode request API via FSM.
-    ct:pal("Waiting for response from fsm command..."),
-    FsmResult = rpc:call(Node1, ?APP, fsm_ping, []),
-    ?assertMatch(ok, FsmResult),
-
-    stop(Nodes),
-
-    ok.
+-define(METADATA_PREFIX, {test, test}).
+-define(METADATA_KEY, key).
+-define(METADATA_VALUE, value).
 
 %% ===================================================================
 %% Internal functions.
@@ -668,7 +146,7 @@ start(_Case, Config, Options) ->
                             filelib:ensure_dir(PlatformDir),
                             filelib:ensure_dir(RingDir),
 
-                            ok = rpc:call(Node, application, set_env, [riak_core, cluster_name, atom_to_list(?APP)]),
+                            ok = rpc:call(Node, application, set_env, [riak_core, cluster_name, atom_to_list(default)]),
                             ok = rpc:call(Node, application, set_env, [riak_core, riak_state_dir, RingDir]),
                             ok = rpc:call(Node, application, set_env, [riak_core, ring_creation_size, NumberOfVNodes]),
 
@@ -714,7 +192,7 @@ start(_Case, Config, Options) ->
             case Parallelism of
                 undefined -> 
                     ct:pal("Using default level of parallelism."),
-                    ok = rpc:call(Node, partisan_config, set, [parallelism, ?PARALLELISM]);
+                    ok = rpc:call(Node, partisan_config, set, [parallelism, ?DEFAULT_PARALLELISM]);
                 _ ->
                     ct:pal("Using ~p level of parallelism.", [Parallelism]),
                     ok = rpc:call(Node, partisan_config, set, [parallelism, Parallelism])
@@ -734,7 +212,7 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
-            ok = rpc:call(Node, partisan_config, set, [channels, ?CHANNELS]),
+            ok = rpc:call(Node, partisan_config, set, [channels, ?DEFAULT_CHANNELS]),
             ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
     lists:foreach(ConfigureFun, Nodes),
@@ -1042,9 +520,9 @@ del_all_files([Dir | T], EmptyDirs) ->
 verify_open_connections(Me, Others, Connections) ->
     %% Verify we have connections to the peers we should have.
     R = lists:map(fun(Other) ->
-                        Parallelism = rpc:call(Me, partisan_config, get, [parallelism, ?PARALLELISM]),
+                        Parallelism = rpc:call(Me, partisan_config, get, [parallelism, ?DEFAULT_PARALLELISM]),
                         OtherName = rpc:call(Other, partisan_peer_service_manager, myself, []),
-                        DesiredConnections = Parallelism * (length(?CHANNELS) + 1),
+                        DesiredConnections = Parallelism * (length(?DEFAULT_CHANNELS) + 1),
                         case dict:find(OtherName, Connections) of
                             {ok, Active} ->
                                 case length(Active) of
@@ -1128,8 +606,8 @@ wait_until_metadata_read(Nodes) ->
 verify_metadata_read(Nodes) ->
     %% Verify that we can read that value at all nodes.
     R = lists:map(fun(Node) ->
-                          case rpc:call(Node, riak_core_metadata, get, [?PREFIX, ?KEY]) of
-                              ?VALUE ->
+                          case rpc:call(Node, riak_core_metadata, get, [?METADATA_PREFIX, ?METADATA_KEY]) of
+                              ?METADATA_VALUE ->
                                   true;
                               _ ->
                                   false
@@ -1139,8 +617,8 @@ verify_metadata_read(Nodes) ->
     lists:all(fun(X) -> X =:= true end, R).
 
 %% @private
-metadata_write(Node) ->
-    case rpc:call(Node, riak_core_metadata, put, [?PREFIX, ?KEY, ?VALUE]) of
+perform_metadata_write(Node) ->
+    case rpc:call(Node, riak_core_metadata, put, [?METADATA_PREFIX, ?METADATA_KEY, ?METADATA_VALUE]) of
         ok ->
             ok;
         _ ->
@@ -1221,3 +699,16 @@ bench_config() ->
             ct:pal("Using alternative bench config: ~p", [Config]),
             [{bench_config, Config}]
     end.
+
+%% @private
+root_path(Config) ->
+    DataDir = proplists:get_value(data_dir, Config, ""),
+    DataDir ++ "../../../../../".
+
+%% @private
+root_dir(Config) ->
+    RootCommand = "cd " ++ root_path(Config) ++ "; pwd",
+    RootOutput = os:cmd(RootCommand),
+    RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
+    ct:pal("RootDir: ~p", [RootDir]),
+    RootDir.
