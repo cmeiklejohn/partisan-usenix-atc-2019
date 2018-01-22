@@ -31,39 +31,39 @@ tail-logs:
 		
 bench: kill
 	@echo "Running Distributed Erlang benchmark with configuration $(BENCH_CONFIG)..."
-	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=default_SUITE --group=disterl --case=bench_test
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test
 	@echo "Running Partisan benchmark with configuration $(BENCH_CONFIG)..."
-	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=default_SUITE --group=partisan --case=bench_test
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test
 
 extended-bench: kill bench
 	@echo "Running Partisan (parallel) benchmark with configuration $(BENCH_CONFIG)..."
-	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=default_SUITE --group=partisan_with_parallelism --case=bench_test
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_parallelism --case=bench_test
 	@echo "Running Partisan (binary padding) benchmark with configuration $(BENCH_CONFIG)..."
-	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=default_SUITE --group=partisan_with_binary_padding --case=bench_test
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_binary_padding --case=bench_test
 
 without-partisan-test: kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=disterl
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=disterl
 
 with-partisan-test: kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=partisan
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=partisan
 
 scale-test: clear-logs kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=scale
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=scale
 
 large-scale-test: kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=large_scale
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=large_scale
 
 partisan-scale-test: clear-logs kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=partisan_scale
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=partisan_scale
 
 partisan-large-scale-test: kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=partisan_large_scale
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=partisan_large_scale
 
 partisan-with-binary-padding-test: kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=partisan_with_binary_padding
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=partisan_with_binary_padding
 
 partisan-with-parallelism-test: kill
-	$(REBAR) ct -v --readable=false --suite=default_SUITE --group=partisan_with_parallelism
+	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=partisan_with_parallelism
 
 prod-release:
 	$(REBAR) as prod release

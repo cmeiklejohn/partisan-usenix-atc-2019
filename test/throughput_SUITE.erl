@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %%
 
--module(default_SUITE).
+-module(throughput_SUITE).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
@@ -75,10 +75,10 @@ end_per_testcase(Case, Config) ->
     Config.
 
 init_per_group(disterl, Config) ->
-    init_per_group(undefined, Config);
+    Config;
 
 init_per_group(partisan, Config) ->
-    [{partisan_dispatch, true}] ++ init_per_group(undefined, Config);
+    [{partisan_dispatch, true}] ++ Config;
 
 init_per_group(partisan_races, Config) ->
     init_per_group(partisan, Config);
@@ -92,8 +92,11 @@ init_per_group(partisan_with_parallelism, Config) ->
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 
+init_per_group(bench, Config) ->
+    bench_config() ++ Config;
+
 init_per_group(_, Config) ->
-    bench_config() ++ Config.
+    Config.
 
 end_per_group(_, _Config) ->
     ok.
@@ -108,16 +111,19 @@ groups() ->
      {basic, [],
       [membership_test, 
        metadata_test, 
-       bench_test,
        get_put_test,
-       vnode_test]},
+       vnode_test,
+       {group, bench}]},
+
+     {bench, [],
+      [bench_test]},
 
      {failures, [],
       [large_gossip_test,
        transition_test]},
 
      {default, [],
-      [bench_test]
+      [{group, bench}]
      },
 
      {disterl, [],
@@ -146,11 +152,11 @@ groups() ->
      {partisan_large_scale, [],
       [large_scale_test]},
 
-     {partisan_with_binary_padding, [],
-      [bench_test]},
-
      {partisan_with_parallelism, [],
-      [bench_test]}
+      [{group, bench}]},
+
+     {partisan_with_binary_padding, [],
+      [{group, bench}]}
     ].
 
 %% ===================================================================
