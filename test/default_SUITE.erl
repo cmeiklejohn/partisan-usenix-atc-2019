@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %%
 
--module(unir_SUITE).
+-module(default_SUITE).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
@@ -1174,7 +1174,7 @@ rand_bits(Bits) ->
 
 %% @private
 default_bench_configuration() ->
-    [{bench_config, "unir_default.config"}].
+    [{bench_config, "default.config"}].
 
 %% @private
 bench_config() ->
