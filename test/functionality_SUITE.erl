@@ -88,9 +88,6 @@ init_per_group(partisan_with_binary_padding, Config) ->
 init_per_group(partisan_with_vnode_partitioning, Config) ->
     [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
 
-init_per_group(bench, Config) ->
-    ?SUPPORT:bench_config() ++ Config;
-
 init_per_group(_, Config) ->
     Config.
 
@@ -108,18 +105,14 @@ groups() ->
       [membership_test, 
        metadata_test, 
        get_put_test,
-       vnode_test,
-       {group, bench}]},
-
-     {bench, [],
-      [bench_test]},
+       vnode_test]},
 
      {failures, [],
       [large_gossip_test,
        transition_test]},
 
      {default, [],
-      [{group, bench}]
+      [{group, basic}]
      },
 
      {disterl, [],
@@ -149,127 +142,18 @@ groups() ->
       [large_scale_test]},
 
      {partisan_with_parallelism, [],
-      [{group, bench}]},
+      [{group, basic}]},
 
      {partisan_with_binary_padding, [],
-      [{group, bench}]},
+      [{group, basic}]},
 
      {partisan_with_vnode_partitioning, [],
-      [{group, bench}]}
+      [{group, basic}]}
     ].
 
 %% ===================================================================
 %% Tests.
 %% ===================================================================
-
-bench_test(Config) ->
-    Nodes = ?SUPPORT:start(bench_test,
-                           Config,
-                           [{num_nodes, 3},
-                           {partisan_peer_service_manager,
-                               partisan_default_peer_service_manager}]),
-
-    ct:pal("Configuration: ~p", [Config]),
-
-    RootDir = ?SUPPORT:root_dir(Config),
-
-    %% Configure parameters.
-    ResultsParameters = case proplists:get_value(partisan_dispatch, Config, false) of
-        true ->
-            BinaryPadding = case proplists:get_value(binary_padding, Config, false) of
-                true ->
-                    "binary-padding";
-                false ->
-                    "no-binary-padding"
-            end,
-
-            VnodePartitioning = case proplists:get_value(vnode_partitioning, Config, false) of
-                true ->
-                    "vnode-partitioning";
-                false ->
-                    "no-vnode-partitioning"
-            end,
-
-            Parallelism = case proplists:get_value(parallelism, Config, 1) of
-                1 ->
-                    "parallelism-" ++ integer_to_list(1);
-                P ->
-                    "parallelism-" ++ integer_to_list(P)
-            end,
-
-            "partisan-" ++ BinaryPadding ++ "-" ++ VnodePartitioning ++ "-" ++ Parallelism;
-        false ->
-            "disterl"
-    end,
-
-    %% Select the node configuration.
-    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
-
-    %% Verify partisan connection is configured with the correct
-    %% membership information.
-    ct:pal("Waiting for partisan membership..."),
-    ?assertEqual(ok, ?SUPPORT:wait_until_partisan_membership(SortedNodes)),
-
-    %% Ensure we have the right number of connections.
-    %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
-    ?assertEqual(ok, ?SUPPORT:wait_until_all_connections(SortedNodes)),
-
-    %% Configure bench paths.
-    BenchDir = RootDir ++ "_build/default/lib/lasp_bench/",
-
-    %% Build bench.
-    ct:pal("Building benchmarking suite..."),
-    BuildCommand = "cd " ++ BenchDir ++ "; make all",
-    _BuildOutput = os:cmd(BuildCommand),
-    % ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
-
-    %% Get benchmark configuration.
-    BenchConfig = ?config(bench_config, Config),
-
-    %% Run bench.
-    ct:pal("Executing benchmark..."),
-    SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
-    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/" ++ BenchConfig,
-    _BenchOutput = os:cmd(BenchCommand),
-    % ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
-
-    %% Generate results.
-    ct:pal("Generating results..."),
-    ResultsCommand = "cd " ++ BenchDir ++ "; make results",
-    _ResultsOutput = os:cmd(ResultsCommand),
-    % ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
-
-    case os:getenv("TRAVIS") of
-        false ->
-            %% Make results dir.
-            ct:pal("Making results output directory..."),
-            DirCommand = "mkdir " ++ RootDir ++ "results/",
-            _DirOutput = os:cmd(DirCommand),
-            % ct:pal("~p => ~p", [DirCommand, DirOutput]),
-
-            %% Get full path to the results.
-            ReadLinkCommand = "readlink " ++ BenchDir ++ "tests/current",
-            ReadLinkOutput = os:cmd(ReadLinkCommand),
-            FullResultsPath = string:substr(ReadLinkOutput, 1, length(ReadLinkOutput) - 1),
-            ct:pal("~p => ~p", [ReadLinkCommand, ReadLinkOutput]),
-
-            %% Get directory name.
-            Directory = string:substr(FullResultsPath, string:rstr(FullResultsPath, "/") + 1, length(FullResultsPath)),
-            ResultsDirectory = Directory ++ "-" ++ BenchConfig ++ "-" ++ ResultsParameters,
-
-            %% Copy results.
-            ct:pal("Copying results into output directory: ~p", [ResultsDirectory]),
-            CopyCommand = "cp -rpv " ++ FullResultsPath ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
-            _CopyOutput = os:cmd(CopyCommand);
-            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
-        _ ->
-            ok
-    end,
-
-    ?SUPPORT:stop(Nodes),
-
-    ok.
 
 large_scale_test(Config) ->
     case os:getenv("TRAVIS") of
