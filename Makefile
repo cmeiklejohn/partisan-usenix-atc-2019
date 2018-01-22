@@ -40,6 +40,8 @@ extended-bench: kill bench
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_parallelism --case=bench_test
 	@echo "Running Partisan (binary padding) benchmark with configuration $(BENCH_CONFIG)..."
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_binary_padding --case=bench_test
+	@echo "Running Partisan (vnode partitioning) benchmark with configuration $(BENCH_CONFIG)..."
+	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_vnode_partitioning --case=bench_test
 
 without-partisan-test: kill
 	$(REBAR) ct -v --readable=false --suite=throughput_SUITE --group=disterl

@@ -91,6 +91,8 @@ init_per_group(partisan_with_parallelism, Config) ->
     [{parallelism, 5}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_vnode_partitioning, Config) ->
+    [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
 
 init_per_group(bench, Config) ->
     bench_config() ++ Config;
@@ -156,6 +158,9 @@ groups() ->
       [{group, bench}]},
 
      {partisan_with_binary_padding, [],
+      [{group, bench}]},
+
+     {partisan_with_vnode_partitioning, [],
       [{group, bench}]}
     ].
 
@@ -191,6 +196,13 @@ bench_test(Config) ->
                     "no-binary-padding"
             end,
 
+            VnodePartitioning = case proplists:get_value(vnode_partitioning, Config, false) of
+                true ->
+                    "vnode-partitioning";
+                false ->
+                    "no-vnode-partitioning"
+            end,
+
             Parallelism = case proplists:get_value(parallelism, Config, ?PARALLELISM) of
                 ?PARALLELISM ->
                     "parallelism-" ++ integer_to_list(?PARALLELISM);
@@ -198,7 +210,7 @@ bench_test(Config) ->
                     "parallelism-" ++ integer_to_list(P)
             end,
 
-            "partisan-" ++ BinaryPadding ++ "-" ++ Parallelism;
+            "partisan-" ++ BinaryPadding ++ "-" ++ VnodePartitioning ++ "-" ++ Parallelism;
         false ->
             "disterl"
     end,
@@ -683,6 +695,16 @@ start(_Case, Config, Options) ->
                 true ->
                     ct:pal("Enabling binary padding."),
                     ok = rpc:call(Node, partisan_config, set, [binary_padding, BinaryPadding]);
+                _ ->
+                    ok
+            end,
+
+            %% Configure vnode partitioning in Riak Core.
+            VnodePartitioning = ?config(vnode_partitioning, Config),
+            case VnodePartitioning of
+                true ->
+                    ct:pal("Enabling vnode partitioning."),
+                    ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, VnodePartitioning]);
                 _ ->
                     ok
             end,
