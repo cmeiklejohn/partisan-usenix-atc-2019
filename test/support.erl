@@ -112,6 +112,18 @@ start(_Case, Config, Options) ->
                      end,
     Nodes = lists:map(InitializerFun, NodeNames),
 
+    %% Ping nodes to ensure we are connected via disterl.
+    ConnectionFun = fun({_Name, Node}) ->
+        case net_adm:ping(Node) of
+            pong ->
+                ok;
+            pang ->
+                ct:fail("Failed to connect to node ~p with distributed Erlang.", [Node]),
+                ok
+        end
+    end, 
+    lists:map(ConnectionFun, Nodes),
+
     %% Load applications on all of the nodes.
     LoaderFun = fun({Name, Node}) ->
                             % ct:pal("Loading applications on node: ~p", [Node]),

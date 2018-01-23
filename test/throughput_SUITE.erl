@@ -39,12 +39,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(APP, unir).
--define(CLIENT_NUMBER, 3).
--define(PEER_PORT, 9000).
--define(GET_REQUEST, fsm_get).
--define(PUT_REQUEST, fsm_put).
-
 -define(SUPPORT, support).
 
 %% ===================================================================
@@ -123,7 +117,22 @@ groups() ->
 %% Tests.
 %% ===================================================================
 
-bench_test(Config) ->
+bench_test(Config0) ->
+    RootDir = ?SUPPORT:root_dir(Config0),
+
+    ct:pal("Configuration was: ~p", [Config0]),
+
+    Config = case file:consult(RootDir ++ "config/test.config") of
+        {ok, Terms} ->
+            ct:pal("Read terms configuration: ~p", [Terms]),
+            Terms ++ Config0;
+        {error, Reason} ->
+            ct:fail("Could not open the terms configuration: ~p", [Reason]),
+            ok
+    end,
+
+    ct:pal("Configuration is now: ~p", [Config]),
+
     Nodes = ?SUPPORT:start(bench_test,
                            Config,
                            [{num_nodes, 3},
