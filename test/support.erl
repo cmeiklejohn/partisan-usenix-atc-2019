@@ -110,19 +110,27 @@ start(_Case, Config, Options) ->
                                     ct:fail(Error)
                             end
                      end,
-    Nodes = lists:map(InitializerFun, NodeNames),
 
-    %% Ping nodes to ensure we are connected via disterl.
-    ConnectionFun = fun({_Name, Node}) ->
-        case net_adm:ping(Node) of
-            pong ->
-                ok;
-            pang ->
-                ct:fail("Failed to connect to node ~p with distributed Erlang.", [Node]),
-                ok
-        end
-    end, 
-    lists:map(ConnectionFun, Nodes),
+    %% Use started nodes, if possible.
+    Nodes = case proplists:get_value(nodes, Config, []) of
+        [] ->
+            lists:map(InitializerFun, NodeNames);
+        StartedNodes ->
+            %% Ping nodes to ensure we are connected via disterl.
+            ConnectionFun = fun(Node) ->
+                case net_adm:ping(Node) of
+                    pong ->
+                        StringNode = atom_to_list(Node),
+                        {string:substr(StringNode, 1, length(StringNode) - string:rstr(StringNode, "@") - 2), Node};
+                    pang ->
+                        ct:fail("Failed to connect to node ~p with distributed Erlang.", [Node]),
+                        ok
+                end
+            end, 
+            lists:map(ConnectionFun, StartedNodes)
+    end,
+
+    ct:pal("Nodes are ~p", [Nodes]),
 
     %% Load applications on all of the nodes.
     LoaderFun = fun({Name, Node}) ->
