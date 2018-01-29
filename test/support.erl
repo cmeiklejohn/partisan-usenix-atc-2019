@@ -176,6 +176,9 @@ start(_Case, Config, Options) ->
 
                             ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, ["../../../../_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/"]]),
 
+                            ok = rpc:call(Node, application, set_env, [riak_sysmon, process_limit, 99999999999]),
+                            ok = rpc:call(Node, application, set_env, [riak_sysmon, port_limit, 99999999999]),
+
                             ok = rpc:call(Node, application, set_env, [riak_api, pb_port, web_ports(Name) + 2]),
                             ok = rpc:call(Node, application, set_env, [riak_api, pb_ip, "127.0.0.1"])
                      end,
