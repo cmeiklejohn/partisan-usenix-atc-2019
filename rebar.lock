@@ -37,7 +37,7 @@
   0},
  {<<"lasp_bench">>,
   {git,"git://github.com/lasp-lang/lasp-bench",
-       {ref,"c0876662be27128cb44a3b2365eeda45e59d6efa"}},
+       {ref,"1265afc43d9a763e08f19300aaebb3118fd67e81"}},
   0},
  {<<"meck">>,
   {git,"git://github.com/basho/meck.git",
