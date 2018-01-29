@@ -39,11 +39,6 @@ busy-port-bench:
 	BENCH_CONFIG=1mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=10mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=32mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=64mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
 		
 bench: kill
 	@echo "Running Distributed Erlang benchmark with configuration $(BENCH_CONFIG)..."
