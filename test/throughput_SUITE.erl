@@ -214,7 +214,7 @@ bench_test(Config0) ->
 
     %% Get busy errors.
     PrivDir = ?config(priv_dir, Config),
-    BusyErrors = os:cmd("grep -r busy_" ++ PrivDir ++ " | grep -v bench | wc -l"),
+    BusyErrors = os:cmd("grep -r busy_" ++ PrivDir ++ " | wc -l"),
     BusyErrorsString = string:substr(BusyErrors, 1, length(BusyErrors) - 1),
     ct:pal("Busy errors: ~p", [list_to_integer(BusyErrorsString)]),
 
