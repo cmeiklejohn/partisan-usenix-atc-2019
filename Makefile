@@ -29,13 +29,15 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
-single-bench: kill
-	BENCH_CONFIG=512kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
-
-single-partisan-bench: kill
-	BENCH_CONFIG=512kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
+single-bench:
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=sync_ping.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=sync_ping.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
 
 busy-port-bench:
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=default.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=32kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
@@ -48,12 +50,10 @@ busy-port-bench:
 	BENCH_CONFIG=2mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=4mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=8mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=10mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 		
 busy-port-partisan-bench:
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=default.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=32kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
@@ -66,10 +66,6 @@ busy-port-partisan-bench:
 	BENCH_CONFIG=2mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=4mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=8mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=10mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
 
 bench: kill
 	@echo "Running Distributed Erlang benchmark with configuration $(BENCH_CONFIG)..."

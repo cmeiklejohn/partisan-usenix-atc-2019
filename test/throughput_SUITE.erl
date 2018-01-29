@@ -255,7 +255,7 @@ bench_test(Config0) ->
             _LogOutput = os:cmd(LogsCommand),
             % ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
 
-            %% Consult the benchmark file.
+            %% Consult the benchmark file for benchmark terms.
             BenchConfigTerms = case file:consult(RootDir ++ "examples/" ++ BenchConfig) of
                 {ok, BenchTerms} ->
                     ct:pal("Read bench terms configuration: ~p", [BenchTerms]),
@@ -265,6 +265,7 @@ bench_test(Config0) ->
                     ok
             end,
             {fixed_bin, Size} = proplists:get_value(value_generator, BenchConfigTerms, undefined),
+            TestType = proplists:get_value(type, BenchConfigTerms, undefined),
 
             %% Write aggregate results.
             AggregateResultsFile = RootDir ++ "results/aggregate.csv",
@@ -276,7 +277,7 @@ bench_test(Config0) ->
                 _ ->
                     disterl
             end,
-            io:format(FileHandle, "~p,~p,~p,~p~n", [Mode, Size, TotalOps, BusyErrors]),
+            io:format(FileHandle, "~p,~p,~p,~p,~p~n", [TestType, Mode, Size, TotalOps, BusyErrors]),
             file:close(FileHandle);
         _ ->
             ok
