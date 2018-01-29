@@ -197,12 +197,26 @@ bench_test(Config0) ->
     %% Get benchmark configuration.
     BenchConfig = ?config(bench_config, Config),
 
+    %% Register our process.
+    yes = global:register_name(runner, self()),
+
     %% Run bench.
-    ct:pal("Executing benchmark..."),
     SortedNodesString = lists:flatten(lists:join(",", lists:map(fun(N) -> atom_to_list(N) end, SortedNodes))),
-    BenchCommand = "cd " ++ BenchDir ++ "; NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/" ++ BenchConfig,
-    _BenchOutput = os:cmd(BenchCommand),
-    % ct:pal("~p => ~p", [BenchCommand, BenchOutput]),
+    RunnerString = atom_to_list(node()),
+    BenchCommand = "cd " ++ BenchDir ++ "; RUNNER=\"" ++ RunnerString ++ "\" NODES=\"" ++ SortedNodesString ++ "\" _build/default/bin/lasp_bench " ++ RootDir ++ "examples/" ++ BenchConfig,
+    ct:pal("Executing benchmark: ~p", [BenchCommand]),
+    BenchOutput = os:cmd(BenchCommand),
+    ct:pal("Benchmark output: ~p => ~p", [BenchCommand, BenchOutput]),
+
+    %% Receive results.
+    TotalOps = receive_bench_operations(0),
+    ct:pal("Total operations issued: ~p", [TotalOps]),
+
+    %% Get busy errors.
+    PrivDir = ?config(priv_dir, Config),
+    BusyErrors = os:cmd("grep -r busy_" ++ PrivDir ++ " | grep -v bench | wc -l"),
+    BusyErrorsString = string:substr(BusyErrors, 1, length(BusyErrors) - 1),
+    ct:pal("Busy errors: ~p", [list_to_integer(BusyErrorsString)]),
 
     %% Generate results.
     ct:pal("Generating results..."),
@@ -231,8 +245,14 @@ bench_test(Config0) ->
             %% Copy results.
             ct:pal("Copying results into output directory: ~p", [ResultsDirectory]),
             CopyCommand = "cp -rpv " ++ FullResultsPath ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
-            _CopyOutput = os:cmd(CopyCommand);
-            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]);
+            _CopyOutput = os:cmd(CopyCommand),
+            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
+
+            %% Copy logs.
+            ct:pal("Copying logs into output directory: ~p", [ResultsDirectory]),
+            LogsCommand = "cp -rpv " ++ PrivDir ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
+            _LogOutput = os:cmd(LogsCommand);
+            % ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
         _ ->
             ok
     end,
@@ -240,3 +260,11 @@ bench_test(Config0) ->
     ?SUPPORT:stop(Nodes),
 
     ok.
+
+receive_bench_operations(TotalOps) ->
+    receive
+        {bench_operations, Ops} ->
+            receive_bench_operations(TotalOps + Ops)
+    after 10000 ->
+        TotalOps
+    end.
