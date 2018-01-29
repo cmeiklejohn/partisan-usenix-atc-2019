@@ -46,6 +46,20 @@ busy-port-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=10mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 		
+busy-port-partisan-bench:
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=1kb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=1mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=2mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=4mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=8mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=10mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+
 bench: kill
 	@echo "Running Distributed Erlang benchmark with configuration $(BENCH_CONFIG)..."
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test
