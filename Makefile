@@ -32,6 +32,9 @@ tail-logs:
 single-bench: kill
 	BENCH_CONFIG=1kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
 
+single-partisan-bench: kill
+	BENCH_CONFIG=1kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
+
 busy-port-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=1kb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
