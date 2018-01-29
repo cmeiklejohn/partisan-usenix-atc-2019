@@ -214,9 +214,10 @@ bench_test(Config0) ->
 
     %% Get busy errors.
     PrivDir = ?config(priv_dir, Config),
-    BusyErrors = os:cmd("grep -r busy_ " ++ PrivDir ++ " | wc -l"),
-    BusyErrorsString = string:substr(BusyErrors, 1, length(BusyErrors) - 1),
-    ct:pal("Busy errors: ~p", [list_to_integer(BusyErrorsString)]),
+    BusyErrorsRaw = os:cmd("grep -r busy_ " ++ PrivDir ++ " | wc -l"),
+    BusyErrorsString = string:substr(BusyErrorsRaw, 1, length(BusyErrorsRaw) - 1),
+    BusyErrors = list_to_integer(BusyErrorsString),
+    ct:pal("Busy errors: ~p", [BusyErrors]),
 
     %% Generate results.
     ct:pal("Generating results..."),
@@ -251,8 +252,32 @@ bench_test(Config0) ->
             %% Copy logs.
             ct:pal("Copying logs into output directory: ~p", [ResultsDirectory]),
             LogsCommand = "cp -rpv " ++ PrivDir ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
-            _LogOutput = os:cmd(LogsCommand);
+            _LogOutput = os:cmd(LogsCommand),
             % ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
+
+            %% Consult the benchmark file.
+            BenchConfigTerms = case file:consult(RootDir ++ "examples/" ++ BenchConfig) of
+                {ok, BenchTerms} ->
+                    ct:pal("Read bench terms configuration: ~p", [BenchTerms]),
+                    BenchTerms;
+                {error, BenchErrorReason} ->
+                    ct:fail("Could not open the bench terms configuration: ~p", [BenchErrorReason]),
+                    ok
+            end,
+            {fixed_bin, Size} = proplists:get_value(value_generator, BenchConfigTerms, undefined),
+
+            %% Write aggregate results.
+            AggregateResultsFile = RootDir ++ "results/aggregate.csv",
+            ct:pal("Writing aggregate results to: ~p", [AggregateResultsFile]),
+            {ok, FileHandle} = file:open(AggregateResultsFile, [append]),
+            Mode = case ?config(partisan_dispatch, Config) of
+                true ->
+                    partisan;
+                _ ->
+                    disterl
+            end,
+            io:format(FileHandle, "~p,~p,~p,~p~n", [Mode, Size, TotalOps, BusyErrors]),
+            file:close(FileHandle);
         _ ->
             ok
     end,
