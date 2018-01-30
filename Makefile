@@ -29,6 +29,12 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
+ping-bench:
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
+
 single-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=32kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
@@ -60,8 +66,6 @@ busy-port-bench:
 	BENCH_CONFIG=96kb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=512kb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
-	pkill -9 beam.smp; pkill -9 epmd; exit 0
-	BENCH_CONFIG=1mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=1mb_object.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
@@ -121,6 +125,9 @@ clean:
 
 dialyzer:
 	$(REBAR) dialyzer
+
+functionality-test: kill release
+	$(REBAR) ct --readable=false -v --suite=functionality_SUITE --case=vnode_test
 
 test: kill release
 	$(REBAR) ct --readable=false -v

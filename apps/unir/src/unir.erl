@@ -9,7 +9,8 @@
          sync_spawn_ping/0,
          fsm_ping/0,
          fsm_get/1,
-         fsm_put/2
+         fsm_put/2,
+         echo/0
         ]).
 
 -ignore_xref([
@@ -38,6 +39,15 @@ sync_ping() ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, unir),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_command(IndexNode, ping, unir_vnode_master).
+
+%% @doc Perform an echo request.
+echo() ->
+    DocIdx = riak_core_util:chash_key({<<"echo">>, term_to_binary(os:timestamp())}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, unir),
+    [{IndexNode, _Type}] = PrefList,
+    EchoBinary = partisan_config:get(echo_binary, undefined),
+    {echo, EchoBinary} = riak_core_vnode_master:sync_command(IndexNode, {echo, EchoBinary}, unir_vnode_master),
+    ok.
 
 %% @doc Pings a random vnode to make sure communication is functional
 sync_spawn_ping() ->

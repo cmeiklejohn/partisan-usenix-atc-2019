@@ -200,6 +200,10 @@ start(_Case, Config, Options) ->
                     ok
             end,
 
+            ct:pal("Storing 1024KB object in the echo binary storage."),
+            EchoBinary = rand_bits(1024 * 1024 * 8),
+            ok = rpc:call(Node, partisan_config, set, [echo_binary, EchoBinary]),
+
             %% Configure vnode partitioning in Riak Core.
             VnodePartitioning = ?config(vnode_partitioning, Config),
             case VnodePartitioning of
@@ -227,6 +231,7 @@ start(_Case, Config, Options) ->
                 true ->
                     ct:pal("Enabling partisan dispatch on node ~p!", [Node]);
                 _ ->
+                    ct:pal("Partisan dispatch is NOT enabled!", []),
                     ok
             end,
             ok = rpc:call(Node, application, set_env, [riak_core, partisan_dispatch, PartisanDispatch]),
@@ -235,7 +240,11 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
+
+            ct:pal("Configuring channels: ~p", [?DEFAULT_CHANNELS]),
             ok = rpc:call(Node, partisan_config, set, [channels, ?DEFAULT_CHANNELS]),
+
+            ct:pal("Disabling gossip.", []),
             ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
     lists:foreach(ConfigureFun, Nodes),

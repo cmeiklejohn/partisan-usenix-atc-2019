@@ -62,6 +62,8 @@ handle_command({get, {ReqId, _}, _Key}, _Sender, #state{binary=Value}=State) ->
     {reply, {ok, ReqId, Value}, State};
 handle_command({ping, {ReqId, _}}, _Sender, State) ->
     {reply, {ok, ReqId}, State};
+handle_command({echo, EchoBinary}, _Sender, State) ->
+    {reply, {echo, EchoBinary}, State};
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 handle_command(Message, _Sender, State) ->

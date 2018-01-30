@@ -423,9 +423,15 @@ vnode_test(Config) ->
     SyncSpawnCommandResult = rpc:call(Node1, ?APP, sync_spawn_ping, []),
     ?assertMatch({pong, _}, SyncSpawnCommandResult),
 
+    %% Test the echo functionality.
+    ct:pal("Waiting for response from echo command..."),
+    EchoCommandResult = rpc:call(Node1, ?APP, echo, []),
+    ?assertMatch(ok, EchoCommandResult),
+
     %% Attempt to access the vnode request API via FSM.
     ct:pal("Waiting for response from fsm command..."),
     FsmResult = rpc:call(Node1, ?APP, fsm_ping, []),
+    ct:pal("FSM result: ~p", [FsmResult]),
     ?assertMatch(ok, FsmResult),
 
     ?SUPPORT:stop(Nodes),
