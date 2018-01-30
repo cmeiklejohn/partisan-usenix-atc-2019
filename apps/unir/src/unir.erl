@@ -46,7 +46,11 @@ echo() ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, unir),
     [{IndexNode, _Type}] = PrefList,
     EchoBinary = partisan_config:get(echo_binary, undefined),
-    {echo, EchoBinary} = riak_core_vnode_master:sync_command(IndexNode, {echo, EchoBinary}, unir_vnode_master),
+    ok = riak_core_vnode_master:command(IndexNode, {echo, EchoBinary, node(), self()}, unir_vnode_master),
+    receive
+        {echo, EchoBinary} ->
+            ok
+    end,
     ok.
 
 %% @doc Pings a random vnode to make sure communication is functional
