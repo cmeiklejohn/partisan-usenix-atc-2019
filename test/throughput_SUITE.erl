@@ -278,7 +278,12 @@ bench_test(Config0) ->
             {ok, FileHandle} = file:open(AggregateResultsFile, [append]),
             Mode = case ?config(partisan_dispatch, Config) of
                 true ->
-                    partisan;
+                    case ?config(binary_padding, Config) of
+                        true ->
+                            partisan_padded;
+                        _ ->
+                            partisan
+                    end;
                 _ ->
                     disterl
             end,
