@@ -279,7 +279,7 @@ bench_test(Config0) ->
             Mode = case ?config(partisan_dispatch, Config) of
                 true ->
                     case ?config(parallelism, Config) of
-                        1 ->
+                        undefined ->
                             partisan;
                         Conns ->
                             list_to_atom("partisan_" ++ integer_to_list(Conns))
