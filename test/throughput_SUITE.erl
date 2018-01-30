@@ -282,7 +282,7 @@ bench_test(Config0) ->
                         1 ->
                             partisan;
                         Conns ->
-                            list_to_atom("partisan_" + integer_to_list(Conns))
+                            list_to_atom("partisan_" ++ integer_to_list(Conns))
                     end;
                 _ ->
                     disterl
