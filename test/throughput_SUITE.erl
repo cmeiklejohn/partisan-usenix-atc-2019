@@ -69,7 +69,7 @@ init_per_group(partisan, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 
 init_per_group(partisan_with_parallelism, Config) ->
-    [{parallelism, 5}] ++ init_per_group(partisan, Config);
+    [{parallelism, 2}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_vnode_partitioning, Config) ->
@@ -278,11 +278,11 @@ bench_test(Config0) ->
             {ok, FileHandle} = file:open(AggregateResultsFile, [append]),
             Mode = case ?config(partisan_dispatch, Config) of
                 true ->
-                    case ?config(binary_padding, Config) of
-                        true ->
-                            partisan_padded;
-                        _ ->
-                            partisan
+                    case ?config(parallelism, Config) of
+                        1 ->
+                            partisan;
+                        Conns ->
+                            list_to_atom("partisan_" + integer_to_list(Conns))
                     end;
                 _ ->
                     disterl
