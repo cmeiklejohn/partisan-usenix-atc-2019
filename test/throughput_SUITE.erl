@@ -208,22 +208,14 @@ bench_test(Config0) ->
     BenchOutput = os:cmd(BenchCommand),
     ct:pal("Benchmark output: ~p => ~p", [BenchCommand, BenchOutput]),
 
-    %% Receive results.
-    TotalOps = receive_bench_operations(0),
-    ct:pal("Total operations issued: ~p", [TotalOps]),
-
-    %% Get busy errors.
-    PrivDir = ?config(priv_dir, Config),
-    BusyErrorsRaw = os:cmd("grep -r busy_ " ++ PrivDir ++ " | wc -l"),
-    BusyErrorsString = string:substr(BusyErrorsRaw, 1, length(BusyErrorsRaw) - 1),
-    BusyErrors = list_to_integer(BusyErrorsString),
-    ct:pal("Busy errors: ~p", [BusyErrors]),
-
     %% Generate results.
     ct:pal("Generating results..."),
     ResultsCommand = "cd " ++ BenchDir ++ "; make results",
     _ResultsOutput = os:cmd(ResultsCommand),
     % ct:pal("~p => ~p", [ResultsCommand, ResultsOutput]),
+
+    %% Get priv dir.
+    PrivDir = ?config(priv_dir, Config),
 
     case os:getenv("TRAVIS") of
         false ->
@@ -267,6 +259,19 @@ bench_test(Config0) ->
             {fixed_bin, Size} = proplists:get_value(value_generator, BenchConfigTerms, undefined),
             TestType = proplists:get_value(type, BenchConfigTerms, undefined),
 
+            %% Receive results.
+            %% TotalOpsMessages = receive_bench_operations(0),
+            %% ct:pal("Total operations issued based on messages: ~p", [TotalOpsMessages]),
+
+            TotalOpsSummary = get_total_ops(FullResultsPath),
+            ct:pal("Total operations issued based on summary: ~p", [TotalOpsSummary]),
+
+            %% Get busy errors.
+            BusyErrorsRaw = os:cmd("grep -r busy_ " ++ PrivDir ++ " | wc -l"),
+            BusyErrorsString = string:substr(BusyErrorsRaw, 1, length(BusyErrorsRaw) - 1),
+            BusyErrors = list_to_integer(BusyErrorsString),
+            ct:pal("Busy errors: ~p", [BusyErrors]),
+
             %% Write aggregate results.
             AggregateResultsFile = RootDir ++ "results/aggregate.csv",
             ct:pal("Writing aggregate results to: ~p", [AggregateResultsFile]),
@@ -277,7 +282,7 @@ bench_test(Config0) ->
                 _ ->
                     disterl
             end,
-            io:format(FileHandle, "~p,~p,~p,~p,~p~n", [TestType, Mode, Size, TotalOps, BusyErrors]),
+            io:format(FileHandle, "~p,~p,~p,~p,~p~n", [TestType, Mode, Size, TotalOpsSummary, BusyErrors]),
             file:close(FileHandle);
         _ ->
             ok
@@ -293,4 +298,26 @@ receive_bench_operations(TotalOps) ->
             receive_bench_operations(TotalOps + Ops)
     after 10000 ->
         TotalOps
+    end.
+
+get_total_ops(ResultsDir) ->
+    {ok, Device} = file:open(ResultsDir ++ "/summary.csv", [read]),
+
+    %% Dump header line.
+    _ = io:get_line(Device, ""),
+
+    try get_totals(Device, 0)
+        after file:close(Device)
+    end.
+
+get_totals(Device, Total) ->
+    case io:get_line(Device, "") of
+        eof  -> 
+            Total;
+        Line -> 
+            Tokens = string:tokens(Line, ","),
+            RawOps = lists:nth(3, Tokens),
+            TruncRawOps = string:sub_string(RawOps, 2),
+            Ops = list_to_integer(TruncRawOps),
+            get_totals(Device, Total + Ops)
     end.
