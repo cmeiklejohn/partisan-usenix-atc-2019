@@ -5,17 +5,90 @@ library(ggplot2)
 data <- read.csv(file="C:\\Users\\chris\\GitHub\\unir\\results\\aggregate.csv", 
                  head=FALSE, sep=",")
 
-# Filter out the pings
-Data = data[data$V3 != 0,]
+# Rename the columns
+colnames(data)[2] <- "Backend"
+colnames(data)[3] <- "Size"
+colnames(data)[4] <- "Operations"
+colnames(data)[5] <- "Errors"
 
-# Partisan 
-PartisanOperations = Data[Data$V2 == "partisan", c(4)]
-PartisanSize = Data[Data$V2 == "partisan", c(3)]
+# Filter out the pings for the perf data
+PerfData = data[data$Size != 0 & data$Size != 32768 & data$Size != 65536,]
 
-# Disterl
-DisterlOperations = Data[Data$V2 == "disterl", c(4)]
-DisterlSize = Data[Data$V2 == "disterl", c(3)]
+# Copy data
+CopyData = data[data$Size < 524288,]
 
-plot(DisterlSize, DisterlOperations, type="o", 
-     col="blue", xlab="Object Size (Bytes)", ylab="Total Operations")
-lines(PartisanSize, PartisanOperations, type="o", col="red")
+# Plot performance
+ggplot(aes(y = log2(Operations), x = Size, colour = Backend), data = PerfData, stat="identity", label="hi") + 
+  
+  geom_point(aes(shape=Backend)) +
+  
+  geom_line(aes(linetype=Backend)) +
+  
+  scale_x_discrete(name = "Object Size (KB)", 
+                   expand=c(0.05, 0.1),
+                   breaks=c(98304, 524288, 1048576, 2097152, 4194304),
+                   labels=c("96", "512", "1024", "2048", "4096"),
+                   limits=c(98304, 524288, 1048576, 2097152, 4194304)) +
+  
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1)) +
+  
+  ylab("Total Operations (log2)") +
+  
+  ggtitle("10:1 Get/Put KVS Workload for 2 minutes with Riak Core")
+
+# Plot copy penalty
+ggplot(aes(y = log2(Operations), x = Size, colour = Backend), data = CopyData, stat="identity", label="hi") + 
+  
+  geom_point(aes(shape=Backend)) +
+  
+  geom_line(aes(linetype=Backend)) +
+  
+  scale_x_discrete(name = "Object Size (KB)", 
+                   expand=c(0.05, 0.1),
+                   breaks=c(0, 32768, 65536, 98304),
+                   labels=c("0", "32", "64", "96"),
+                   limits=c(0, 32768, 65536, 98304)) +
+  
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1)) +
+  
+  ylab("Total Operations (log2)") +
+  
+  ggtitle("10:1 Get/Put KVS Workload for 2 minutes with Riak Core")
+
+# Plot performance
+ggplot(aes(y = log2(Operations), x = Size, colour = Backend), data = PerfData, stat="identity", label="hi") + 
+  
+  geom_point(aes(shape=Backend)) +
+  
+  geom_line(aes(linetype=Backend)) +
+  
+  scale_x_discrete(name = "Object Size (KB)", 
+                   expand=c(0.05, 0.1),
+                   breaks=c(98304, 524288, 1048576, 2097152, 4194304),
+                   labels=c("96", "512", "1024", "2048", "4096"),
+                   limits=c(98304, 524288, 1048576, 2097152, 4194304)) +
+  
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1)) +
+  
+  ylab("Total Operations (log2)") +
+  
+  ggtitle("10:1 Get/Put KVS Workload for 2 minutes with Riak Core")
+
+# Plot errors
+ggplot(aes(y = Errors, x = Size, colour = Backend), data = PerfData, stat="identity", label="hi") + 
+  
+  geom_point(aes(shape=Backend)) +
+  
+  geom_line(aes(linetype=Backend)) +
+  
+  scale_x_discrete(name = "Object Size (KB)", 
+                   expand=c(0.05, 0.1),
+                   breaks=c(98304, 524288, 1048576, 2097152, 4194304),
+                   labels=c("96", "512", "1024", "2048", "4096"),
+                   limits=c(98304, 524288, 1048576, 2097152, 4194304)) +
+  
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1)) +
+  
+  ylab("Errors") +
+  
+  ggtitle("10:1 Get/Put KVS Workload for 2 minutes with Riak Core")
