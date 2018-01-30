@@ -36,6 +36,18 @@ single-bench:
 	BENCH_CONFIG=32kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=32kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan_with_binary_padding --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=64kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=64kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=64kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan_with_binary_padding --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=96kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=disterl --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=96kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan --case=bench_test
+	pkill -9 beam.smp; pkill -9 epmd; exit 0
+	BENCH_CONFIG=96kb_object.config $(REBAR) ct --readable=false -v --suite=throughput_SUITE --group=partisan_with_binary_padding --case=bench_test
 
 busy-port-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
