@@ -172,6 +172,23 @@ bench_test(Config0) ->
             "disterl"
     end,
 
+    %% Consult the benchmark file for benchmark terms.
+    BenchConfigTerms = case file:consult(RootDir ++ "examples/" ++ BenchConfig) of
+        {ok, BenchTerms} ->
+            ct:pal("Read bench terms configuration: ~p", [BenchTerms]),
+            BenchTerms;
+        {error, BenchErrorReason} ->
+            ct:fail("Could not open the bench terms configuration: ~p", [BenchErrorReason]),
+            ok
+    end,
+    {fixed_bin, Size} = proplists:get_value(value_generator, BenchConfigTerms, undefined),
+    TestType = proplists:get_value(type, BenchConfigTerms, undefined),
+
+    %% Store the echo binary.
+    ct:pal("Storing ~p byte object in the echo binary storage."),
+    EchoBinary = rand_bits(Size * 8),
+    ok = rpc:call(Node, partisan_config, set, [echo_binary, EchoBinary]),
+
     %% Select the node configuration.
     SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
 
@@ -246,18 +263,6 @@ bench_test(Config0) ->
             LogsCommand = "cp -rpv " ++ PrivDir ++ " " ++ RootDir ++ "results/" ++ ResultsDirectory,
             _LogOutput = os:cmd(LogsCommand),
             % ct:pal("~p => ~p", [CopyCommand, CopyOutput]),
-
-            %% Consult the benchmark file for benchmark terms.
-            BenchConfigTerms = case file:consult(RootDir ++ "examples/" ++ BenchConfig) of
-                {ok, BenchTerms} ->
-                    ct:pal("Read bench terms configuration: ~p", [BenchTerms]),
-                    BenchTerms;
-                {error, BenchErrorReason} ->
-                    ct:fail("Could not open the bench terms configuration: ~p", [BenchErrorReason]),
-                    ok
-            end,
-            {fixed_bin, Size} = proplists:get_value(value_generator, BenchConfigTerms, undefined),
-            TestType = proplists:get_value(type, BenchConfigTerms, undefined),
 
             %% Receive results.
             %% TotalOpsMessages = receive_bench_operations(0),
