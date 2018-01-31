@@ -190,7 +190,7 @@ bench_test(Config0) ->
     %% Configure the echo terms.
     ConfigureFun = fun({_, N}) ->
         %% Store the echo binary.
-        ct:pal("Storing ~p byte object in the echo binary storage."),
+        ct:pal("Storing ~p byte object in the echo binary storage.", [Size]),
         EchoBinary = rand_bits(Size * 8),
         ok = rpc:call(N, partisan_config, set, [echo_binary, EchoBinary])
     end,
