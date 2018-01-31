@@ -172,6 +172,9 @@ bench_test(Config0) ->
             "disterl"
     end,
 
+    %% Get benchmark configuration.
+    BenchConfig = ?config(bench_config, Config),
+
     %% Consult the benchmark file for benchmark terms.
     BenchConfigTerms = case file:consult(RootDir ++ "examples/" ++ BenchConfig) of
         {ok, BenchTerms} ->
@@ -184,10 +187,14 @@ bench_test(Config0) ->
     {fixed_bin, Size} = proplists:get_value(value_generator, BenchConfigTerms, undefined),
     TestType = proplists:get_value(type, BenchConfigTerms, undefined),
 
-    %% Store the echo binary.
-    ct:pal("Storing ~p byte object in the echo binary storage."),
-    EchoBinary = rand_bits(Size * 8),
-    ok = rpc:call(Node, partisan_config, set, [echo_binary, EchoBinary]),
+    %% Configure the echo terms.
+    ConfigureFun = fun({_, N}) ->
+        %% Store the echo binary.
+        ct:pal("Storing ~p byte object in the echo binary storage."),
+        EchoBinary = rand_bits(Size * 8),
+        ok = rpc:call(N, partisan_config, set, [echo_binary, EchoBinary])
+    end,
+    lists:foreach(ConfigureFun, Nodes),
 
     %% Select the node configuration.
     SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
@@ -210,9 +217,6 @@ bench_test(Config0) ->
     BuildCommand = "cd " ++ BenchDir ++ "; make all",
     _BuildOutput = os:cmd(BuildCommand),
     % ct:pal("~p => ~p", [BuildCommand, BuildOutput]),
-
-    %% Get benchmark configuration.
-    BenchConfig = ?config(bench_config, Config),
 
     %% Register our process.
     yes = global:register_name(runner, self()),
@@ -331,3 +335,9 @@ get_totals(Device, Total) ->
             Ops = list_to_integer(TruncRawOps),
             get_totals(Device, Total + Ops)
     end.
+
+%% @private
+rand_bits(Bits) ->
+        Bytes = (Bits + 7) div 8,
+        <<Result:Bits/bits, _/bits>> = crypto:strong_rand_bytes(Bytes),
+        Result.
