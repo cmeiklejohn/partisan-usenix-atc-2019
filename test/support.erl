@@ -200,8 +200,8 @@ start(_Case, Config, Options) ->
                     ok
             end,
 
-            ct:pal("Storing 2048 KB object in the echo binary storage."),
-            EchoBinary = rand_bits(2048 * 1024 * 8),
+            ct:pal("Storing 4096 KB object in the echo binary storage."),
+            EchoBinary = rand_bits(4096 * 1024 * 8),
             ok = rpc:call(Node, partisan_config, set, [echo_binary, EchoBinary]),
 
             %% Configure vnode partitioning in Riak Core.
