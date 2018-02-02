@@ -4,11 +4,14 @@ RELPATH = _build/default/rel/unir
 PRODRELPATH = _build/prod/rel/unir
 APPNAME = unir
 SHELL = /bin/bash
+CONCURRENCY 	 ?= 4
+LATENCY 		 ?= 0
+SIZE 			 ?= 1024
 
 compile:
 	$(REBAR) compile
 
-release:
+release: compile
 	$(REBAR) release
 	mkdir -p $(RELPATH)/../unir_config
 	[ -f $(RELPATH)/../unir_config/unir.conf ] || cp $(RELPATH)/etc/unir.conf  $(RELPATH)/../unir_config/unir.conf
@@ -36,6 +39,11 @@ echo-bench:
 	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=partisan --case=bench_test --readable=false -v
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_parallelism --case=bench_test --readable=false -v
+
+perf: release
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=performance_test --group=disterl
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=performance_test --group=partisan
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=performance_test --group=partisan_with_parallelism
 
 single-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0

@@ -10,7 +10,8 @@
          fsm_ping/0,
          fsm_get/1,
          fsm_put/2,
-         echo/0
+         echo/0,
+         echo/1
         ]).
 
 -ignore_xref([
@@ -42,10 +43,14 @@ sync_ping() ->
 
 %% @doc Perform an echo request.
 echo() ->
+    EchoBinary = partisan_config:get(echo_binary, undefined),
+    echo(EchoBinary).
+
+%% @doc Perform an echo request.
+echo(EchoBinary) ->
     DocIdx = riak_core_util:chash_key({<<"echo">>, term_to_binary(os:timestamp())}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, unir),
     [{IndexNode, _Type}] = PrefList,
-    EchoBinary = partisan_config:get(echo_binary, undefined),
     ok = riak_core_vnode_master:command(IndexNode, {echo, EchoBinary, node(), self()}, unir_vnode_master),
     receive
         {echo, EchoBinary} ->

@@ -69,7 +69,7 @@ init_per_group(partisan, Config) ->
     [{partisan_dispatch, true}] ++ Config;
 
 init_per_group(partisan_with_parallelism, Config) ->
-    [{parallelism, 2}] ++ init_per_group(partisan, Config);
+    parallelism() ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_vnode_partitioning, Config) ->
@@ -92,7 +92,8 @@ all() ->
 groups() ->
     [
      {bench, [],
-      [bench_test]},
+      [bench_test,
+       performance_test]},
 
      {default, [],
       [{group, bench}] },
@@ -116,6 +117,103 @@ groups() ->
 %% ===================================================================
 %% Tests.
 %% ===================================================================
+
+performance_test(Config) ->
+    Manager = partisan_default_peer_service_manager,
+
+    Nodes = ?SUPPORT:start(performance_test,
+                           Config,
+                           [{num_nodes, 2},
+                           {partisan_peer_service_manager, Manager}]),
+
+    ct:pal("Configuration: ~p", [Config]),
+
+    %% Pause for clustering.
+    timer:sleep(1000),
+
+    [{_, Node1}|_] = Nodes,
+
+    %% One process per connection.
+    Concurrency = case os:getenv("CONCURRENCY", "1") of
+        undefined ->
+            1;
+        C ->
+            list_to_integer(C)
+    end,
+
+    %% Latency.
+    Latency = case os:getenv("LATENCY", "0") of
+        undefined ->
+            0;
+        L ->
+            list_to_integer(L)
+    end,
+
+    %% Size.
+    Size = case os:getenv("SIZE", "1024") of
+        undefined ->
+            0;
+        S ->
+            list_to_integer(S)
+    end,
+
+    %% Parallelism.
+    Parallelism = case rpc:call(Node1, partisan_config, get, [parallelism]) of
+        undefined ->
+            1;
+        P ->
+            P
+    end,
+        
+    NumMessages = 1000,
+    BenchPid = self(),
+    BytesSize = Size * 1024,
+
+    %% Prime a binary at each node.
+    ct:pal("Generating binaries!"),
+    EchoBinary = rand_bits(BytesSize * 8),
+
+    %% Spawn processes to send receive messages on node 1.
+    ct:pal("Spawning processes."),
+    SenderPids = lists:map(fun(SenderNum) ->
+        SenderFun = fun() ->
+            init_sender(BenchPid, SenderNum, EchoBinary, NumMessages)
+        end,
+        rpc:call(Node1, erlang, spawn, [SenderFun])
+    end, lists:seq(1, Concurrency)),
+
+    %% Start bench.
+    ProfileFun = fun() ->
+        %% Start sending.
+        lists:foreach(fun(SenderPid) ->
+            SenderPid ! start
+        end, SenderPids),
+
+        %% Wait for them all.
+        bench_receiver(Concurrency)
+    end,
+    {Time, _Value} = timer:tc(ProfileFun),
+
+    %% Write results.
+    RootDir = root_dir(Config),
+    ResultsFile = RootDir ++ "results.csv",
+    ct:pal("Writing results to: ~p", [ResultsFile]),
+    {ok, FileHandle} = file:open(ResultsFile, [append]),
+    Backend = case ?config(partisan_dispatch, Config) of
+        true ->
+            partisan;
+        _ ->
+            disterl
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    file:close(FileHandle),
+
+    ct:pal("Time: ~p", [Time]),
+
+    %% Stop nodes.
+    ?SUPPORT:stop(Nodes),
+
+    ok.
 
 bench_test(Config0) ->
     RootDir = ?SUPPORT:root_dir(Config0),
@@ -153,7 +251,7 @@ bench_test(Config0) ->
                     "no-binary-padding"
             end,
 
-            VnodePartitioning = case proplists:get_value(vnode_partitioning, Config, false) of
+            VnodePartitioning = case proplists:get_value(vnode_partitioning, Config, true) of
                 true ->
                     "vnode-partitioning";
                 false ->
@@ -341,3 +439,61 @@ rand_bits(Bits) ->
         Bytes = (Bits + 7) div 8,
         <<Result:Bits/bits, _/bits>> = crypto:strong_rand_bytes(Bytes),
         Result.
+
+%% @private
+sender(BenchPid, SenderNum, EchoBinary, 0) ->
+    BenchPid ! done,
+    ok;
+sender(BenchPid, SenderNum, EchoBinary, Count) ->
+    ObjectName = list_to_binary("object-1" ++ integer_to_list(SenderNum)),
+
+    case Count rem 10 == 0 of
+        true ->
+            unir:fsm_put(ObjectName, EchoBinary);
+        false ->
+            unir:fsm_get(ObjectName)
+    end,
+    sender(BenchPid, SenderNum, EchoBinary, Count -1).
+
+init_sender(BenchPid, SenderNum, EchoBinary, Count) ->
+    receive
+        start ->
+            ok
+    end,
+    sender(BenchPid, SenderNum, EchoBinary, Count).
+
+%% @private
+root_path(Config) ->
+    DataDir = proplists:get_value(data_dir, Config, ""),
+    DataDir ++ "../../../../../".
+
+%% @private
+root_dir(Config) ->
+    RootCommand = "cd " ++ root_path(Config) ++ "; pwd",
+    RootOutput = os:cmd(RootCommand),
+    RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
+    ct:pal("RootDir: ~p", [RootDir]),
+    RootDir.
+
+%% @private
+parallelism() ->
+    case os:getenv("PARALLELISM", "1") of
+        false ->
+            [{parallelism, list_to_integer("1")}];
+        "1" ->
+            [{parallelism, list_to_integer("1")}];
+        Config ->
+            [{parallelism, list_to_integer(Config)}]
+    end.
+
+%% @private
+bench_receiver(0) ->
+    ok;
+bench_receiver(Count) ->
+    ct:pal("Waiting for ~p processes to finish...", [Count]),
+
+    receive
+        done ->
+            ct:pal("Received, but still waiting for ~p", [Count -1]),
+            bench_receiver(Count - 1)
+    end.
