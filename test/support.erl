@@ -207,7 +207,8 @@ start(_Case, Config, Options) ->
                     ct:pal("Enabling vnode partitioning."),
                     ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, VnodePartitioning]);
                 _ ->
-                    ok
+                    ct:pal("Disabling vnode partitioning."),
+                    ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, false])
             end,
 
             %% Get parallelism factor.

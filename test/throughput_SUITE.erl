@@ -70,6 +70,8 @@ init_per_group(partisan, Config) ->
 
 init_per_group(partisan_with_parallelism, Config) ->
     parallelism() ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_partitioned_parallelism, Config) ->
+    parallelism() ++ [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_vnode_partitioning, Config) ->
@@ -109,6 +111,9 @@ groups() ->
      {partisan_with_parallelism, [],
       [{group, bench}]},
 
+     {partisan_with_partitioned_parallelism, [],
+      [{group, bench}]},
+
      {partisan_with_binary_padding, [],
       [{group, bench}]},
 
@@ -123,10 +128,25 @@ groups() ->
 partisan_performance_test(Config) ->
     Manager = partisan_default_peer_service_manager,
 
-    Nodes = ?SUPPORT:start(partisan_performance_test,
+    Nodes = case os:getenv("PARTISAN_INIT", false) of
+        "true" ->
+            %% Specify servers.
+            Servers = partisan_support:node_list(1, "server", Config),
+
+            %% Specify clients.
+            Clients = partisan_support:node_list(1, "client", Config),
+
+            %% Start nodes.
+            partisan_support:start(partisan_performance_test, Config,
+                                   [{partisan_peer_service_manager, Manager},
+                                   {servers, Servers},
+                                   {clients, Clients}]);
+        _ ->
+            ?SUPPORT:start(partisan_performance_test,
                            Config,
                            [{num_nodes, 3},
-                           {partisan_peer_service_manager, Manager}]),
+                           {partisan_peer_service_manager, Manager}])
+    end,
 
     ct:pal("Configuration: ~p", [Config]),
 
