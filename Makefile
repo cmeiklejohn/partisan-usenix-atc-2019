@@ -40,10 +40,20 @@ echo-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_parallelism --case=bench_test --readable=false -v
 
-perf: release
-	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=performance_test --group=disterl
-	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=performance_test --group=partisan
-	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=performance_test --group=partisan_with_parallelism
+fsm-perf: release
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=disterl
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=partisan
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=partisan_with_parallelism
+
+echo-perf: release
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=echo_performance_test --group=disterl
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=echo_performance_test --group=partisan
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=echo_performance_test --group=partisan_with_parallelism
+
+partisan-perf: release
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=disterl
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=partisan
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=partisan_with_parallelism
 
 single-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0

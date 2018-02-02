@@ -93,7 +93,9 @@ groups() ->
     [
      {bench, [],
       [bench_test,
-       performance_test]},
+       fsm_performance_test,
+       partisan_performance_test,
+       echo_performance_test]},
 
      {default, [],
       [{group, bench}] },
@@ -118,12 +120,115 @@ groups() ->
 %% Tests.
 %% ===================================================================
 
-performance_test(Config) ->
+partisan_performance_test(Config) ->
     Manager = partisan_default_peer_service_manager,
 
-    Nodes = ?SUPPORT:start(performance_test,
+    Nodes = ?SUPPORT:start(partisan_performance_test,
                            Config,
-                           [{num_nodes, 2},
+                           [{num_nodes, 3},
+                           {partisan_peer_service_manager, Manager}]),
+
+    ct:pal("Configuration: ~p", [Config]),
+
+    %% Pause for clustering.
+    timer:sleep(1000),
+
+    [{_, Node1}, {_, Node2}|_] = Nodes,
+
+    %% One process per connection.
+    Concurrency = case os:getenv("CONCURRENCY", "1") of
+        undefined ->
+            1;
+        C ->
+            list_to_integer(C)
+    end,
+
+    %% Latency.
+    Latency = case os:getenv("LATENCY", "0") of
+        undefined ->
+            0;
+        L ->
+            list_to_integer(L)
+    end,
+
+    %% Size.
+    Size = case os:getenv("SIZE", "1024") of
+        undefined ->
+            0;
+        S ->
+            list_to_integer(S)
+    end,
+
+    %% Parallelism.
+    Parallelism = case rpc:call(Node1, partisan_config, get, [parallelism]) of
+        undefined ->
+            1;
+        P ->
+            P
+    end,
+        
+    NumMessages = 1000,
+    BenchPid = self(),
+    BytesSize = Size * 1024,
+
+    %% Prime a binary at each node.
+    ct:pal("Generating binaries!"),
+    EchoBinary = rand_bits(BytesSize * 8),
+
+    %% Spawn processes to send receive messages on node 1.
+    ct:pal("Spawning processes."),
+    SenderPids = lists:map(fun(SenderNum) ->
+        ReceiverFun = fun() ->
+            receiver(Manager, BenchPid, NumMessages)
+        end,
+        ReceiverPid = rpc:call(Node2, erlang, spawn, [ReceiverFun]),
+
+        SenderFun = fun() ->
+            init_sender(EchoBinary, Manager, Node2, ReceiverPid, SenderNum, NumMessages)
+        end,
+        SenderPid = rpc:call(Node1, erlang, spawn, [SenderFun]),
+        SenderPid
+    end, lists:seq(1, Concurrency)),
+
+    %% Start bench.
+    ProfileFun = fun() ->
+        %% Start sending.
+        lists:foreach(fun(SenderPid) ->
+            SenderPid ! start
+        end, SenderPids),
+
+        %% Wait for them all.
+        bench_receiver(Concurrency)
+    end,
+    {Time, _Value} = timer:tc(ProfileFun),
+
+    %% Write results.
+    RootDir = root_dir(Config),
+    ResultsFile = RootDir ++ "results.csv",
+    ct:pal("Writing results to: ~p", [ResultsFile]),
+    {ok, FileHandle} = file:open(ResultsFile, [append]),
+    Backend = case ?config(partisan_dispatch, Config) of
+        true ->
+            partisan;
+        _ ->
+            disterl
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    file:close(FileHandle),
+
+    ct:pal("Time: ~p", [Time]),
+
+    %% Stop nodes.
+    ?SUPPORT:stop(Nodes),
+
+    ok.
+
+echo_performance_test(Config) ->
+    Manager = partisan_default_peer_service_manager,
+
+    Nodes = ?SUPPORT:start(echo_performance_test,
+                           Config,
+                           [{num_nodes, 3},
                            {partisan_peer_service_manager, Manager}]),
 
     ct:pal("Configuration: ~p", [Config]),
@@ -177,7 +282,104 @@ performance_test(Config) ->
     ct:pal("Spawning processes."),
     SenderPids = lists:map(fun(SenderNum) ->
         SenderFun = fun() ->
-            init_sender(BenchPid, SenderNum, EchoBinary, NumMessages)
+            init_echo_sender(BenchPid, SenderNum, EchoBinary, NumMessages)
+        end,
+        rpc:call(Node1, erlang, spawn, [SenderFun])
+    end, lists:seq(1, Concurrency)),
+
+    %% Start bench.
+    ProfileFun = fun() ->
+        %% Start sending.
+        lists:foreach(fun(SenderPid) ->
+            SenderPid ! start
+        end, SenderPids),
+
+        %% Wait for them all.
+        bench_receiver(Concurrency)
+    end,
+    {Time, _Value} = timer:tc(ProfileFun),
+
+    %% Write results.
+    RootDir = root_dir(Config),
+    ResultsFile = RootDir ++ "results.csv",
+    ct:pal("Writing results to: ~p", [ResultsFile]),
+    {ok, FileHandle} = file:open(ResultsFile, [append]),
+    Backend = case ?config(partisan_dispatch, Config) of
+        true ->
+            partisan;
+        _ ->
+            disterl
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    file:close(FileHandle),
+
+    ct:pal("Time: ~p", [Time]),
+
+    %% Stop nodes.
+    ?SUPPORT:stop(Nodes),
+
+    ok.
+
+fsm_performance_test(Config) ->
+    Manager = partisan_default_peer_service_manager,
+
+    Nodes = ?SUPPORT:start(fsm_performance_test,
+                           Config,
+                           [{num_nodes, 3},
+                           {partisan_peer_service_manager, Manager}]),
+
+    ct:pal("Configuration: ~p", [Config]),
+
+    %% Pause for clustering.
+    timer:sleep(1000),
+
+    [{_, Node1}|_] = Nodes,
+
+    %% One process per connection.
+    Concurrency = case os:getenv("CONCURRENCY", "1") of
+        undefined ->
+            1;
+        C ->
+            list_to_integer(C)
+    end,
+
+    %% Latency.
+    Latency = case os:getenv("LATENCY", "0") of
+        undefined ->
+            0;
+        L ->
+            list_to_integer(L)
+    end,
+
+    %% Size.
+    Size = case os:getenv("SIZE", "1024") of
+        undefined ->
+            0;
+        S ->
+            list_to_integer(S)
+    end,
+
+    %% Parallelism.
+    Parallelism = case rpc:call(Node1, partisan_config, get, [parallelism]) of
+        undefined ->
+            1;
+        P ->
+            P
+    end,
+        
+    NumMessages = 1000,
+    BenchPid = self(),
+    BytesSize = Size * 1024,
+
+    %% Prime a binary at each node.
+    ct:pal("Generating binaries!"),
+    EchoBinary = rand_bits(BytesSize * 8),
+
+    %% Spawn processes to send receive messages on node 1.
+    ct:pal("Spawning processes."),
+    SenderPids = lists:map(fun(SenderNum) ->
+        SenderFun = fun() ->
+            init_fsm_sender(BenchPid, SenderNum, EchoBinary, NumMessages)
         end,
         rpc:call(Node1, erlang, spawn, [SenderFun])
     end, lists:seq(1, Concurrency)),
@@ -441,10 +643,26 @@ rand_bits(Bits) ->
         Result.
 
 %% @private
-sender(BenchPid, SenderNum, EchoBinary, 0) ->
+echo_sender(BenchPid, _SenderNum, _EchoBinary, 0) ->
     BenchPid ! done,
     ok;
-sender(BenchPid, SenderNum, EchoBinary, Count) ->
+echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
+    unir:echo(EchoBinary),
+    echo_sender(BenchPid, SenderNum, EchoBinary, Count -1).
+
+%% @private
+init_echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
+    receive
+        start ->
+            ok
+    end,
+    echo_sender(BenchPid, SenderNum, EchoBinary, Count).
+
+%% @private
+fsm_sender(BenchPid, _SenderNum, _EchoBinary, 0) ->
+    BenchPid ! done,
+    ok;
+fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
     ObjectName = list_to_binary("object-1" ++ integer_to_list(SenderNum)),
 
     case Count rem 10 == 0 of
@@ -453,14 +671,15 @@ sender(BenchPid, SenderNum, EchoBinary, Count) ->
         false ->
             unir:fsm_get(ObjectName)
     end,
-    sender(BenchPid, SenderNum, EchoBinary, Count -1).
+    fsm_sender(BenchPid, SenderNum, EchoBinary, Count -1).
 
-init_sender(BenchPid, SenderNum, EchoBinary, Count) ->
+%% @private
+init_fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
     receive
         start ->
             ok
     end,
-    sender(BenchPid, SenderNum, EchoBinary, Count).
+    fsm_sender(BenchPid, SenderNum, EchoBinary, Count).
 
 %% @private
 root_path(Config) ->
@@ -497,3 +716,28 @@ bench_receiver(Count) ->
             ct:pal("Received, but still waiting for ~p", [Count -1]),
             bench_receiver(Count - 1)
     end.
+
+%% @private
+receiver(_Manager, BenchPid, 0) ->
+    BenchPid ! done,
+    ok;
+receiver(Manager, BenchPid, Count) ->
+    receive
+        {_Message, _SourceNode, _SourcePid} ->
+            receiver(Manager, BenchPid, Count - 1)
+    end.
+
+%% @private
+sender(_EchoBinary, _Manager, _DestinationNode, _DestinationPid, _PartitionKey, 0) ->
+    ok;
+sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count) ->
+    Manager:forward_message(DestinationNode, undefined, DestinationPid, {EchoBinary, node(), self()}, [{partition_key, PartitionKey}]),
+    sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count - 1).
+
+%% @private
+init_sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count) ->
+    receive
+        start ->
+            ok
+    end,
+    sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count).
