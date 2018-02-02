@@ -119,11 +119,13 @@ start(_Case, Config, Options) ->
             ct:pal("Setting forward_options to: ~p", [ForwardOptions]),
             ok = rpc:call(Node, partisan_config, set, [forward_options, ForwardOptions]),
 
-            Disterl = case ?config(disterl, Config) of
-                              undefined ->
-                                  false;
+            %% If users call partisan directly, and you want to ensure you dispatch
+            %% using partisan and not riak core, please toggle this option.
+            Disterl = case ?config(partisan_dispatch, Config) of
                               true ->
-                                  true
+                                  false;
+                              _ ->
+                                  false
                           end,
             ct:pal("Setting disterl to: ~p", [Disterl]),
             ok = rpc:call(Node, partisan_config, set, [disterl, Disterl]),

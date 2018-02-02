@@ -233,6 +233,17 @@ start(_Case, Config, Options) ->
             end,
             ok = rpc:call(Node, application, set_env, [riak_core, partisan_dispatch, PartisanDispatch]),
 
+            %% If users call partisan directly, and you want to ensure you dispatch
+            %% using partisan and not riak core, please toggle this option.
+            Disterl = case ?config(partisan_dispatch, Config) of
+                              true ->
+                                  false;
+                              _ ->
+                                  true
+                          end,
+            ct:pal("Setting disterl to: ~p", [Disterl]),
+            ok = rpc:call(Node, partisan_config, set, [disterl, Disterl]),
+
             MaxActiveSize = proplists:get_value(max_active_size, Options, 5),
             ok = rpc:call(Node, partisan_config, set, [persist_state, false]),
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),

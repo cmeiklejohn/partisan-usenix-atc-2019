@@ -148,12 +148,35 @@ partisan_performance_test(Config) ->
                            {partisan_peer_service_manager, Manager}])
     end,
 
+    App = case os:getenv("PARTISAN_INIT", false) of
+        "true" ->
+            partisan;
+        _ ->
+            riak_core
+    end,
+
     ct:pal("Configuration: ~p", [Config]),
 
     %% Pause for clustering.
     timer:sleep(1000),
 
     [{_, Node1}, {_, Node2}|_] = Nodes,
+
+    Profile = case os:getenv("PROFILE", false) of
+        "true" ->
+            ct:pal("Enabling profiling!"),
+            true;
+        _ ->
+            ct:pal("Disabling profiling!"),
+            false
+    end,
+    
+    case Profile of
+        true ->
+            rpc:call(Node1, eprof, start, []);
+        _ ->
+            ok
+    end,
 
     %% One process per connection.
     Concurrency = case os:getenv("CONCURRENCY", "1") of
@@ -233,8 +256,19 @@ partisan_performance_test(Config) ->
         _ ->
             disterl
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
+
+    case Profile of
+        true ->
+            ProfileFile = RootDir ++ "eprof/-" ++ atom_to_list(App) ++ "-" ++ atom_to_list(Backend) ++ "-" ++ integer_to_list(Parallelism),
+            ct:pal("Outputting profile results to file: ~p", [ProfileFile]),
+            rpc:call(Node1, eprof, stop_profiling, []),
+            rpc:call(Node1, eprof, log, [ProfileFile]),
+            rpc:call(Node1, eprof, analyze, []);
+        _ ->
+            ok
+    end,
 
     ct:pal("Time: ~p", [Time]),
 
