@@ -29,4 +29,4 @@ ggplot(aes(y = (Time / 1000 / 1000), x = Concurrency, colour = Backend), data = 
   ylab("Time (ms)") +
   theme(legend.justification = c(1, 1), legend.position = c(1, 0.2)) +
   theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
-  ggtitle("8MB object with 1ms RTT latency")
+  ggtitle("echo request/reply with 8MB object and 1ms RTT latency")
