@@ -261,7 +261,7 @@ partisan_performance_test(Config) ->
 
     case Profile of
         true ->
-            ProfileFile = RootDir ++ "eprof/-" ++ atom_to_list(App) ++ "-" ++ atom_to_list(Backend) ++ "-" ++ integer_to_list(Parallelism),
+            ProfileFile = RootDir ++ "eprof/" ++ atom_to_list(App) ++ "-" ++ atom_to_list(Backend) ++ "-" ++ integer_to_list(Parallelism),
             ct:pal("Outputting profile results to file: ~p", [ProfileFile]),
             rpc:call(Node1, eprof, stop_profiling, []),
             rpc:call(Node1, eprof, log, [ProfileFile]),
@@ -716,8 +716,8 @@ init_echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
 fsm_sender(BenchPid, _SenderNum, _EchoBinary, 0) ->
     BenchPid ! done,
     ok;
-fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
-    ObjectName = list_to_binary("object-1" ++ integer_to_list(SenderNum)),
+fsm_sender(BenchPid, _SenderNum, EchoBinary, Count) ->
+    ObjectName = list_to_binary("object-1" ++ integer_to_list(rand:uniform(1000))),
 
     case Count rem 10 == 0 of
         true ->
