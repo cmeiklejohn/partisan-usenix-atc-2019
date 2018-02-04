@@ -26,7 +26,7 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {partition, binary}).
+-record(state, {partition, binary, store}).
 
 -define(MASTER, unir_vnode_master).
 
@@ -36,7 +36,8 @@ start_vnode(I) ->
 
 init([Partition]) ->
     Binary = rand_bits(512),
-    {ok, #state {partition=Partition, binary=Binary}}.
+    Store = dict:new(),
+    {ok, #state {partition=Partition, binary=Binary, store=Store}}.
 
 put(Preflist, Identity, Key, Value) ->
     riak_core_vnode_master:command(Preflist,
@@ -56,9 +57,16 @@ ping(Preflist, Identity) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-handle_command({put, {ReqId, _}, _Key, Value}, _Sender, State) ->
-    {reply, {ok, ReqId, Value}, State#state{binary=Value}};
-handle_command({get, {ReqId, _}, _Key}, _Sender, #state{binary=Value}=State) ->
+handle_command({put, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
+    Store = dict:store(Key, Value, Store0),
+    {reply, {ok, ReqId, Value}, State#state{store=Store, binary=Value}};
+handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store, binary=Value}=State) ->
+    Value = case dict:find(Key, Store) of
+        {ok, V} ->
+            V;
+        error ->
+            not_found
+    end,
     {reply, {ok, ReqId, Value}, State};
 handle_command({ping, {ReqId, _}}, _Sender, State) ->
     {reply, {ok, ReqId}, State};

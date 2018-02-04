@@ -716,10 +716,15 @@ init_echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
 fsm_sender(BenchPid, _SenderNum, _EchoBinary, 0) ->
     BenchPid ! done,
     ok;
-fsm_sender(BenchPid, _SenderNum, EchoBinary, Count) ->
-    ObjectName = list_to_binary("object-1" ++ integer_to_list(rand:uniform(1000))),
+fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
+    %% Normal distribution over 10000 keys.
+    RandomNumber = trunc((rand:normal() + 1) * 5000),
 
-    case Count rem 10 == 0 of
+    %% Craft object name.
+    ObjectName = list_to_binary("object" ++ integer_to_list(RandomNumber)),
+
+    %% 50/50 read/write workload.
+    case Count rem 2 == 0 of
         true ->
             unir:fsm_put(ObjectName, EchoBinary);
         false ->
