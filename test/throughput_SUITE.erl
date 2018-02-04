@@ -452,7 +452,7 @@ fsm_performance_test(Config) ->
         %% Wait for them all.
         bench_receiver(length(SenderPids))
     end,
-    {Time, _Value} = timer:tc(ProfileFun),
+    {Time, Value} = timer:tc(ProfileFun),
 
     %% Write results.
     RootDir = root_dir(Config),
@@ -468,7 +468,7 @@ fsm_performance_test(Config) ->
     io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
-    ct:pal("Time: ~p", [Time]),
+    ct:pal("Value: ~p, Time: ~p", [Value, Time]),
 
     %% Stop nodes.
     ?SUPPORT:stop(Nodes),
@@ -717,10 +717,10 @@ init_echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
     echo_sender(BenchPid, SenderNum, EchoBinary, Count).
 
 %% @private
-fsm_sender(BenchPid, _SenderNum, _EchoBinary, 0) ->
-    BenchPid ! done,
+fsm_sender(BenchPid, _SenderNum, _EchoBinary, Success, Failure, 0) ->
+    BenchPid ! {done, Success, Failure},
     ok;
-fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
+fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure, Count) ->
     %% Normal distribution over 10000 keys.
     RandomNumber = trunc((rand:normal() + 1) * 5000),
 
@@ -730,11 +730,20 @@ fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
     %% 50/50 read/write workload.
     case Count rem 2 == 0 of
         true ->
-            unir:fsm_put(ObjectName, EchoBinary);
+            case unir:fsm_put(ObjectName, EchoBinary) of
+                {ok, _Val} ->
+                    fsm_sender(BenchPid, SenderNum, EchoBinary, Success + 1, Failure, Count - 1);
+                {error, timeout} ->
+                    fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure + 1, Count - 1)
+            end;
         false ->
-            unir:fsm_get(ObjectName)
-    end,
-    fsm_sender(BenchPid, SenderNum, EchoBinary, Count -1).
+            case unir:fsm_get(ObjectName) of
+                {ok, _Val} ->
+                    fsm_sender(BenchPid, SenderNum, EchoBinary, Success + 1, Failure, Count - 1);
+                {error, timeout} ->
+                    fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure + 1, Count - 1)
+            end
+    end.
 
 %% @private
 init_fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
@@ -742,7 +751,7 @@ init_fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
         start ->
             ok
     end,
-    fsm_sender(BenchPid, SenderNum, EchoBinary, Count).
+    fsm_sender(BenchPid, SenderNum, EchoBinary, 0, 0, Count).
 
 %% @private
 root_path(Config) ->
@@ -769,15 +778,23 @@ parallelism() ->
     end.
 
 %% @private
-bench_receiver(0) ->
-    ok;
 bench_receiver(Count) ->
+    bench_receiver(0, 0, Count).
+
+%% @private
+bench_receiver(Success, Failure, 0) ->
+    ct:pal("Success: ~p, Failure: ~p", [Success, Failure]),
+    ok;
+bench_receiver(Success, Failure, Count) ->
     ct:pal("Waiting for ~p processes to finish...", [Count]),
 
     receive
         done ->
             ct:pal("Received, but still waiting for ~p", [Count -1]),
-            bench_receiver(Count - 1)
+            bench_receiver(Success, Failure, Count - 1);
+        {done, S, F} ->
+            ct:pal("Received; success: ~p, failure: ~p; but still waiting for ~p", [S, F, Count -1]),
+            bench_receiver(Success + S, Failure + F, Count - 1)
     end.
 
 %% @private
