@@ -57,17 +57,15 @@ ping(Preflist, Identity) ->
                                    ?MASTER).
 
 handle_command({put, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
-    %% Sleep for 1ms, read 1MB from SSD.
+    %% Sleep for 10ms, read 1MB from disk.
     %% https://gist.github.com/jboner/2841832
-    timer:sleep(1),
-
+    timer:sleep(10),
     Store = dict:store(Key, Value, Store0),
     {reply, {ok, ReqId, Value}, State#state{store=Store}};
 handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store}=State) ->
-    %% Sleep for 1ms, read 1MB from SSD.
+    %% Sleep for 10ms, read 1MB from disk.
     %% https://gist.github.com/jboner/2841832
-    timer:sleep(1),
-
+    timer:sleep(10),
     Value = case dict:find(Key, Store) of
         {ok, V} ->
             V;
