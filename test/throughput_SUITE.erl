@@ -433,12 +433,14 @@ fsm_performance_test(Config) ->
 
     %% Spawn processes to send receive messages on node 1.
     ct:pal("Spawning processes."),
-    SenderPids = lists:map(fun(SenderNum) ->
-        SenderFun = fun() ->
-            init_fsm_sender(BenchPid, SenderNum, EchoBinary, NumMessages)
-        end,
-        rpc:call(Node1, erlang, spawn, [SenderFun])
-    end, lists:seq(1, Concurrency)),
+    SenderPids = lists:flatmap(fun({_, Node}) -> 
+            lists:map(fun(SenderNum) ->
+                SenderFun = fun() ->
+                    init_fsm_sender(BenchPid, SenderNum, EchoBinary, NumMessages)
+                end,
+                rpc:call(Node, erlang, spawn, [SenderFun])
+            end, lists:seq(1, Concurrency))
+        end, Nodes),
 
     %% Start bench.
     ProfileFun = fun() ->
@@ -448,7 +450,7 @@ fsm_performance_test(Config) ->
         end, SenderPids),
 
         %% Wait for them all.
-        bench_receiver(Concurrency)
+        bench_receiver(length(SenderPids))
     end,
     {Time, _Value} = timer:tc(ProfileFun),
 
