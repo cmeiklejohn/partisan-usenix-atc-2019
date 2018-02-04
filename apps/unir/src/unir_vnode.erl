@@ -26,7 +26,7 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {partition, binary, store}).
+-record(state, {partition, store}).
 
 -define(MASTER, unir_vnode_master).
 
@@ -35,9 +35,8 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    Binary = rand_bits(512),
     Store = dict:new(),
-    {ok, #state {partition=Partition, binary=Binary, store=Store}}.
+    {ok, #state {partition=Partition, store=Store}}.
 
 put(Preflist, Identity, Key, Value) ->
     riak_core_vnode_master:command(Preflist,
@@ -59,8 +58,8 @@ ping(Preflist, Identity) ->
 
 handle_command({put, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
     Store = dict:store(Key, Value, Store0),
-    {reply, {ok, ReqId, Value}, State#state{store=Store, binary=Value}};
-handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store, binary=Value}=State) ->
+    {reply, {ok, ReqId, Value}, State#state{store=Store}};
+handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store}=State) ->
     Value = case dict:find(Key, Store) of
         {ok, V} ->
             V;
@@ -117,9 +116,3 @@ handle_exit(_Pid, _Reason, State) ->
 
 terminate(_Reason, _State) ->
     ok.
-
-%% @private
-rand_bits(Bits) ->
-    Bytes = (Bits + 7) div 8,
-    <<Result:Bits/bits, _/bits>> = crypto:strong_rand_bytes(Bytes),
-    Result.
