@@ -48,7 +48,7 @@ echo() ->
 
 %% @doc Perform an echo request.
 echo(EchoBinary) ->
-    DocIdx = riak_core_util:chash_key({<<"echo">>, term_to_binary(rand:uniform(1000))}),
+    DocIdx = riak_core_util:chash_key({<<"echo">>, term_to_binary(rand:uniform(1024))}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, unir),
     [{IndexNode, _Type}] = PrefList,
     ok = riak_core_vnode_master:command(IndexNode, {echo, EchoBinary, node(), self()}, unir_vnode_master),
