@@ -144,7 +144,7 @@ partisan_performance_test(Config) ->
         _ ->
             ?SUPPORT:start(partisan_performance_test,
                            Config,
-                           [{num_nodes, 3},
+                           [{num_nodes, 2},
                            {partisan_peer_service_manager, Manager}])
     end,
 
@@ -282,7 +282,7 @@ echo_performance_test(Config) ->
 
     Nodes = ?SUPPORT:start(echo_performance_test,
                            Config,
-                           [{num_nodes, 3},
+                           [{num_nodes, 2},
                            {partisan_peer_service_manager, Manager}]),
 
     ct:pal("Configuration: ~p", [Config]),
@@ -381,7 +381,7 @@ fsm_performance_test(Config) ->
 
     Nodes = ?SUPPORT:start(fsm_performance_test,
                            Config,
-                           [{num_nodes, 3},
+                           [{num_nodes, 2},
                            {partisan_peer_service_manager, Manager}]),
 
     ct:pal("Configuration: ~p", [Config]),
