@@ -704,19 +704,21 @@ scale(Nodes, Config) ->
 
         %% Verify appropriate number of connections.
         NewCluster = CurrentCluster ++ [Node],
-        ct:pal("Verifying connections for expanded cluster: ~p", [NewCluster]),
-        ?assertEqual(ok, wait_until_all_connections(NewCluster)),
 
         %% Ensure each node owns a portion of the ring
-        ?assertEqual(ok, wait_until_nodes_agree_about_ownership(NewCluster)),
-        ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
-        ?assertEqual(ok, wait_until_ring_converged(NewCluster)),
+        ConvergeFun = fun() ->
+            ?assertEqual(ok, wait_until_all_connections(NewCluster)),
+            ?assertEqual(ok, wait_until_nodes_agree_about_ownership(NewCluster)),
+            ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
+            ?assertEqual(ok, wait_until_ring_converged(NewCluster))
+        end,
+        {ConvergeTime, _} = timer:tc(ConvergeFun),
 
-        {ok, Ring} = rpc:call(Node1, riak_core_ring_manager, get_my_ring, []),
+        {ok, Ring} = rpc:call(Node1, riak_core_ring_manager, get_raw_ring, []),
         Size = byte_size(term_to_binary(Ring)),
         NumNodes = length(NewCluster),
-        ct:pal("NumNodes: ~p, Ring Size: ~p", [NumNodes, Size]),
-        io:format(FileHandle, "~p,~p~n", [NumNodes, Size]),
+        ct:pal("ConvergeTime: ~p, NumNodes: ~p, Ring Size: ~p", [ConvergeTime, NumNodes, Size]),
+        io:format(FileHandle, "~p,~p,~p~n", [ConvergeTime, NumNodes, Size]),
 
         NewCluster
     end, InitialCluster, ToBeJoined),
