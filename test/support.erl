@@ -675,9 +675,15 @@ leave(Node) ->
     end.
 
 %% @private
-scale(Nodes) ->
+scale(Nodes, Config) ->
     [{_, Node1}, {_, Node2}|ToBeJoined] = Nodes,
     InitialCluster = [Node1, Node2],
+
+    %% Write results.
+    RootDir = root_dir(Config),
+    ResultsFile = RootDir ++ "results-scale.csv",
+    ct:pal("Writing results to: ~p", [ResultsFile]),
+    {ok, FileHandle} = file:open(ResultsFile, [append]),
 
     %% Cluster the first two ndoes.
     ct:pal("Building initial cluster: ~p", [InitialCluster]),
@@ -706,8 +712,17 @@ scale(Nodes) ->
         ?assertEqual(ok, wait_until_no_pending_changes(NewCluster)),
         ?assertEqual(ok, wait_until_ring_converged(NewCluster)),
 
+        {ok, Ring} = rpc:call(Node1, riak_core_ring_manager, get_my_ring, []),
+        Size = byte_size(term_to_binary(Ring)),
+        NumNodes = length(NewCluster),
+        ct:pal("NumNodes: ~p, Ring Size: ~p", [NumNodes, Size]),
+        io:format(FileHandle, "~p,~p~n", [NumNodes, Size]),
+
         NewCluster
     end, InitialCluster, ToBeJoined),
+
+    %% Close file.
+    file:close(FileHandle),
 
     %% Print final member status to the log.
     rpc:call(Node1, riak_core_console, member_status, [[]]),
