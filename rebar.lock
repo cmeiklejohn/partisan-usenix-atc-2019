@@ -53,13 +53,17 @@
   1},
  {<<"partisan">>,
   {git,"git://github.com/lasp-lang/partisan",
-       {ref,"2f04af6fe6ecceb5b09465f4310670912b4bbdca"}},
+       {ref,"7240dd573f4135291f365aecea8d00abc30bd672"}},
   0},
  {<<"pbkdf2">>,
   {git,"git://github.com/marianoguerra/erlang-pbkdf2-no-history",
        {ref,"b8561cf72b13497ee498ce00bb80e5f2d24f512f"}},
   0},
  {<<"poolboy">>,{pkg,<<"basho_poolboy">>,<<"0.8.2">>},1},
+ {<<"quickrand">>,
+  {git,"https://github.com/okeuday/quickrand.git",
+       {ref,"336c0d94a6a384f307183b3c14fc2112656dac37"}},
+  2},
  {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},1},
  {<<"riak_core">>,
   {git,"git://github.com/lasp-lang/riak_core",
@@ -79,7 +83,11 @@
        {ref,"4878261b8859909569509ad67f6efefb735651f0"}},
   1},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},1},
- {<<"types">>,{pkg,<<"types">>,<<"0.1.6">>},1}]}.
+ {<<"types">>,{pkg,<<"types">>,<<"0.1.6">>},1},
+ {<<"uuid">>,
+  {git,"https://github.com/okeuday/uuid.git",
+       {ref,"aadf1be200d318f2fdf2f996b58852a4a49244f0"}},
+  1}]}.
 [
 {pkg_hash,[
  {<<"acceptor_pool">>, <<"679D741DF87FC13599B1AEF2DF8F78F1F880449A6BEFAB7C44FB6FAE0E92A2DE">>},
