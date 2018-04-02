@@ -86,7 +86,7 @@ fsm_get(Key) ->
 
 %% @doc Generate a request id.
 mk_reqid() ->
-    erlang:phash2(erlang:now()).
+    erlang:phash2(erlang:timestamp()).
 
 %% @doc Wait for a response.
 wait_for_reqid(ReqID, _Timeout) ->
