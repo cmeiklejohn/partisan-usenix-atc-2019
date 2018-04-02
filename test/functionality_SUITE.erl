@@ -158,16 +158,16 @@ groups() ->
 large_scale_test(Config) ->
     case os:getenv("TRAVIS") of
         "true" ->
+            ct:pal("Skipping test; outside of the travis environment.");
+        _ ->
             Nodes = ?SUPPORT:start(large_scale_test,
                                    Config,
                                    [{partisan_peer_service_manager,
                                        partisan_default_peer_service_manager},
-                                   {num_nodes, 20},
+                                   {num_nodes, 30},
                                    {cluster_nodes, false}]),
 
-            ?SUPPORT:scale(Nodes);
-        _ ->
-            ct:pal("Skipping test; outside of the travis environment.")
+            ?SUPPORT:scale(Nodes, Config)
     end,
 
     ok.
@@ -180,7 +180,7 @@ scale_test(Config) ->
                            {num_nodes, 10},
                            {cluster_nodes, false}]),
 
-    ?SUPPORT:scale(Nodes),
+    ?SUPPORT:scale(Nodes, Config),
 
     ok.
 
