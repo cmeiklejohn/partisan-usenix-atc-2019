@@ -46,13 +46,13 @@
 %% @private
 stop(Nodes) ->
     StopFun = fun({Name, _Node}) ->
-        ct:pal("Stopping node: ~p", [Name]),
+        % ct:pal("Stopping node: ~p", [Name]),
 
         case ct_slave:stop(Name) of
             {ok, _} ->
                 ok;
             {error, stop_timeout, _} ->
-                ct:pal("Stop failed for node: ~p", [Name]),
+                % ct:pal("Stop failed for node: ~p", [Name]),
                 ok;
             {error, not_started, _} ->
                 ok;
@@ -70,7 +70,7 @@ codepath() ->
 %% @private
 start(_Case, Config, Options) ->
     %% Launch distribution for the test runner.
-    ct:pal("Launching Erlang distribution..."),
+    % ct:pal("Launching Erlang distribution..."),
 
     os:cmd(os:find_executable("epmd") ++ " -daemon"),
     Hostname = "127.0.0.1",
@@ -95,7 +95,7 @@ start(_Case, Config, Options) ->
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
-                            ct:pal("Starting node: ~p", [Name]),
+                            % ct:pal("Starting node: ~p", [Name]),
 
                             NodeConfig = [{monitor_master, true},
                                           {erl_flags, "-smp"}, %% smp for the eleveldb god
@@ -104,7 +104,7 @@ start(_Case, Config, Options) ->
 
                             case ct_slave:start(Name, NodeConfig) of
                                 {ok, Node} ->
-                                    ct:pal("Node started: ~p", [Node]),
+                                    % ct:pal("Node started: ~p", [Node]),
                                     {Name, Node};
                                 Error ->
                                     ct:fail(Error)
@@ -130,7 +130,7 @@ start(_Case, Config, Options) ->
             lists:map(ConnectionFun, StartedNodes)
     end,
 
-    ct:pal("Nodes are ~p", [Nodes]),
+    % ct:pal("Nodes are ~p", [Nodes]),
 
     %% Load applications on all of the nodes.
     LoaderFun = fun({Name, Node}) ->
@@ -174,7 +174,9 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_ip, "127.0.0.1"]),
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_port, web_ports(Name) + 3]),
 
-                            ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, ["../../../../_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/"]]),
+                            SchemaDir = schema_dir(),
+                            % ct:pal("Schema directory: ~p", [SchemaDir]),
+                            ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, [SchemaDir]]),
 
                             ok = rpc:call(Node, application, set_env, [riak_sysmon, process_limit, 99999999999]),
                             ok = rpc:call(Node, application, set_env, [riak_sysmon, port_limit, 99999999999]),
@@ -194,7 +196,7 @@ start(_Case, Config, Options) ->
             BinaryPadding = ?config(binary_padding, Config),
             case BinaryPadding of
                 true ->
-                    ct:pal("Enabling binary padding."),
+                    % ct:pal("Enabling binary padding."),
                     ok = rpc:call(Node, partisan_config, set, [binary_padding, BinaryPadding]);
                 _ ->
                     ok
@@ -204,10 +206,10 @@ start(_Case, Config, Options) ->
             VnodePartitioning = ?config(vnode_partitioning, Config),
             case VnodePartitioning of
                 true ->
-                    ct:pal("Enabling vnode partitioning."),
+                    % ct:pal("Enabling vnode partitioning."),
                     ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, VnodePartitioning]);
                 _ ->
-                    ct:pal("Disabling vnode partitioning."),
+                    % ct:pal("Disabling vnode partitioning."),
                     ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, false])
             end,
 
@@ -215,10 +217,10 @@ start(_Case, Config, Options) ->
             Parallelism = ?config(parallelism, Config),
             case Parallelism of
                 undefined -> 
-                    ct:pal("Using default level of parallelism."),
+                    % ct:pal("Using default level of parallelism."),
                     ok = rpc:call(Node, partisan_config, set, [parallelism, ?DEFAULT_PARALLELISM]);
                 _ ->
-                    ct:pal("Using ~p level of parallelism.", [Parallelism]),
+                    % ct:pal("Using ~p level of parallelism.", [Parallelism]),
                     ok = rpc:call(Node, partisan_config, set, [parallelism, Parallelism])
             end,
 
@@ -226,9 +228,10 @@ start(_Case, Config, Options) ->
             PartisanDispatch = ?config(partisan_dispatch, Config),
             case PartisanDispatch of
                 true ->
-                    ct:pal("Enabling partisan dispatch on node ~p!", [Node]);
+                    % ct:pal("Enabling partisan dispatch on node ~p!", [Node]),
+                    ok;
                 _ ->
-                    ct:pal("Partisan dispatch is NOT enabled!", []),
+                    % ct:pal("Partisan dispatch is NOT enabled!", []),
                     ok
             end,
             ok = rpc:call(Node, application, set_env, [riak_core, partisan_dispatch, PartisanDispatch]),
@@ -241,7 +244,7 @@ start(_Case, Config, Options) ->
                               _ ->
                                   true
                           end,
-            ct:pal("Setting disterl to: ~p", [Disterl]),
+            % ct:pal("Setting disterl to: ~p", [Disterl]),
             ok = rpc:call(Node, partisan_config, set, [disterl, Disterl]),
 
             MaxActiveSize = proplists:get_value(max_active_size, Options, 5),
@@ -249,15 +252,15 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
 
-            ct:pal("Configuring channels: ~p", [?DEFAULT_CHANNELS]),
+            % ct:pal("Configuring channels: ~p", [?DEFAULT_CHANNELS]),
             ok = rpc:call(Node, partisan_config, set, [channels, ?DEFAULT_CHANNELS]),
 
-            ct:pal("Disabling gossip.", []),
+            % ct:pal("Disabling gossip.", []),
             ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
     lists:foreach(ConfigureFun, Nodes),
 
-    ct:pal("Starting nodes."),
+    % ct:pal("Starting nodes."),
 
     StartFun = fun({_Name, Node}) ->
                         %% Start partisan.
@@ -273,8 +276,8 @@ start(_Case, Config, Options) ->
                             {ok, _} ->
                                 ok;
                             Error ->
-                                ct:pal("Riak Core failed to start: ~p",
-                                       [Error]),
+                                % ct:pal("Riak Core failed to start: ~p",
+                                    %    [Error]),
                                 ct:fail(riak_core_failure)
                         end,
 
@@ -282,7 +285,8 @@ start(_Case, Config, Options) ->
                         {ok, _}  = rpc:call(Node,
                                             application, ensure_all_started,
                                             [?APP]),
-                        ct:pal("Started node ~p", [Node])
+                        % ct:pal("Started node ~p", [Node]),
+                        ok
                end,
     lists:foreach(StartFun, Nodes),
 
@@ -290,13 +294,14 @@ start(_Case, Config, Options) ->
     ClusterNodes = proplists:get_value(cluster_nodes, Options, true),
     case ClusterNodes of
         true ->
-            ct:pal("Clustering nodes."),
+            % ct:pal("Clustering nodes."),
             ok = join_cluster([Node || {_Name, Node} <- Nodes]);
         false ->
-            ct:pal("Skipping cluster formation.")
+            % ct:pal("Skipping cluster formation.")
+            ok
     end,
 
-    ct:pal("Nodes fully initialized: ~p", [Nodes]),
+    % ct:pal("Nodes fully initialized: ~p", [Nodes]),
 
     Nodes.
 
@@ -388,7 +393,7 @@ plan_and_commit(Node) ->
     % lager:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
-            ct:pal("plan: ring not ready"),
+            % ct:pal("plan: ring not ready"),
             timer:sleep(5000),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
@@ -481,7 +486,7 @@ is_ready(Node) ->
 
 %% @private
 wait_until_nodes_agree_about_ownership(Nodes) ->
-    ct:pal("Wait until nodes agree about ownership ~p", [Nodes]),
+    % ct:pal("Wait until nodes agree about ownership ~p", [Nodes]),
     Results = [ wait_until_owners_according_to(Node, Nodes) || Node <- Nodes ],
     ?assert(lists:all(fun(X) -> ok =:= X end, Results)).
 
@@ -491,7 +496,7 @@ wait_until(Node, Fun) when is_atom(Node), is_function(Fun) ->
 
 %% @private
 wait_until_owners_according_to(Node, Nodes) ->
-    ct:pal("Waiting until node ~p agrees ownership on ~p", [Node, Nodes]),
+    % ct:pal("Waiting until node ~p agrees ownership on ~p", [Node, Nodes]),
   SortedNodes = lists:usort(Nodes),
   F = fun(N) ->
       owners_according_to(N) =:= SortedNodes
@@ -618,7 +623,7 @@ verify_partisan_membership(Nodes) ->
                                       true ->
                                           true;
                                       false -> 
-                                          ct:pal("Membership on node ~p is not right: ~p but should be ~p", [Node, JoinedNodes, Nodes]),
+                                        %   ct:pal("Membership on node ~p is not right: ~p but should be ~p", [Node, JoinedNodes, Nodes]),
                                           false
                                   end;
                             Error ->
@@ -682,24 +687,24 @@ scale(Nodes, Config) ->
     %% Write results.
     RootDir = root_dir(Config),
     ResultsFile = RootDir ++ "results-scale.csv",
-    ct:pal("Writing results to: ~p", [ResultsFile]),
+    % ct:pal("Writing results to: ~p", [ResultsFile]),
     {ok, FileHandle} = file:open(ResultsFile, [append]),
 
     %% Cluster the first two ndoes.
-    ct:pal("Building initial cluster: ~p", [InitialCluster]),
+    % ct:pal("Building initial cluster: ~p", [InitialCluster]),
     ?assertEqual(ok, join_cluster(InitialCluster)),
 
     %% Verify appropriate number of connections.
-    ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
+    % ct:pal("Verifying connections for initial cluster: ~p", [InitialCluster]),
     ?assertEqual(ok, wait_until_all_connections(InitialCluster)),
 
     lists:foldl(fun({_, Node}, CurrentCluster) ->
         %% Join another node.
-        ct:pal("Joining ~p to ~p", [Node, Node1]),
+        % ct:pal("Joining ~p to ~p", [Node, Node1]),
         ?assertEqual(ok, staged_join(Node, Node1)),
 
         %% Plan will only succeed once the ring has been gossiped.
-        ct:pal("Committing plan."),
+        % ct:pal("Committing plan."),
         ?assertEqual(ok, plan_and_commit(Node1)),
 
         %% Verify appropriate number of connections.
@@ -717,7 +722,7 @@ scale(Nodes, Config) ->
         {ok, Ring} = rpc:call(Node1, riak_core_ring_manager, get_raw_ring, []),
         Size = byte_size(term_to_binary(Ring)),
         NumNodes = length(NewCluster),
-        ct:pal("ConvergeTime: ~p, NumNodes: ~p, Ring Size: ~p", [ConvergeTime, NumNodes, Size]),
+        % ct:pal("ConvergeTime: ~p, NumNodes: ~p, Ring Size: ~p", [ConvergeTime, NumNodes, Size]),
         io:format(FileHandle, "~p,~p,~p~n", [ConvergeTime, NumNodes, Size]),
 
         NewCluster
@@ -747,13 +752,13 @@ default_bench_configuration() ->
 bench_config() ->
     case os:getenv("BENCH_CONFIG", "") of
         false ->
-            ct:pal("Bench configuration not specified, using default."),
+            % ct:pal("Bench configuration not specified, using default."),
             default_bench_configuration();
         "" ->
-            ct:pal("Bench configuration null, using default."),
+            % ct:pal("Bench configuration null, using default."),
             default_bench_configuration();
         Config ->
-            ct:pal("Using alternative bench config: ~p", [Config]),
+            % ct:pal("Using alternative bench config: ~p", [Config]),
             [{bench_config, Config}]
     end.
 
@@ -767,5 +772,10 @@ root_dir(Config) ->
     RootCommand = "cd " ++ root_path(Config) ++ "; pwd",
     RootOutput = os:cmd(RootCommand),
     RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
-    ct:pal("RootDir: ~p", [RootDir]),
+    % ct:pal("RootDir: ~p", [RootDir]),
     RootDir.
+
+%% @private
+schema_dir() ->
+    %%  "../../../../_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/",
+    "/mnt/c/Users/chris/GitHub/unir/_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/".
