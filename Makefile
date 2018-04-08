@@ -32,6 +32,9 @@ logs:
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
 
+proper: kill
+	$(REBAR) proper
+
 echo-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=disterl --case=bench_test --readable=false -v
