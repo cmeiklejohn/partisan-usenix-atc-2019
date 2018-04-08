@@ -764,7 +764,7 @@ bench_config() ->
 %% @private
 root_path(Config) ->
     DataDir = proplists:get_value(data_dir, Config, ""),
-    DataDir ++ "../../../../../../".
+    DataDir ++ "../../../../../".
 
 %% @private
 root_dir(Config) ->
