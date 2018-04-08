@@ -174,7 +174,7 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_ip, "127.0.0.1"]),
                             ok = rpc:call(Node, application, set_env, [riak_core, handoff_port, web_ports(Name) + 3]),
 
-                            SchemaDir = schema_dir(),
+                            SchemaDir = schema_dir(Config),
                             % ct:pal("Schema directory: ~p", [SchemaDir]),
                             ok = rpc:call(Node, application, set_env, [riak_core, schema_dirs, [SchemaDir]]),
 
@@ -276,8 +276,7 @@ start(_Case, Config, Options) ->
                             {ok, _} ->
                                 ok;
                             Error ->
-                                % ct:pal("Riak Core failed to start: ~p",
-                                    %    [Error]),
+                                ct:pal("Riak Core failed to start: ~p", [Error]),
                                 ct:fail(riak_core_failure)
                         end,
 
@@ -765,17 +764,18 @@ bench_config() ->
 %% @private
 root_path(Config) ->
     DataDir = proplists:get_value(data_dir, Config, ""),
-    DataDir ++ "../../../../../".
+    DataDir ++ "../../../../../../".
 
 %% @private
 root_dir(Config) ->
     RootCommand = "cd " ++ root_path(Config) ++ "; pwd",
     RootOutput = os:cmd(RootCommand),
     RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
-    % ct:pal("RootDir: ~p", [RootDir]),
+    %% ct:pal("RootDir: ~p", [RootDir]),
     RootDir.
 
 %% @private
-schema_dir() ->
+schema_dir(Config) ->
     %%  "../../../../_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/",
-    "/mnt/c/Users/chris/GitHub/unir/_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/".
+    %% "/mnt/c/Users/chris/GitHub/unir/_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/".
+    root_dir(Config) ++ "_build/default/rel/unir/share/schema/".
