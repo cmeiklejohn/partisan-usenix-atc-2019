@@ -29,24 +29,40 @@ prop_test() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {store}).
+-record(state, {joined_nodes, nodes, store}).
 
--define(NUM_NODES, 3).
+-define(NUM_NODES, 5).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
     %% Initialize empty dictionary for process state.
     Store = dict:new(),
 
-    #state{store=Store}.
+    %% Get the list of nodes.
+    Nodes = nodes(),
 
-command(_State) -> 
+    %% All nodes are assumed as joined.
+    JoinedNodes = Nodes,
+
+    #state{joined_nodes=JoinedNodes, nodes=Nodes, store=Store}.
+
+command(#state{joined_nodes=JoinedNodes}) -> 
     oneof([
         {call, ?MODULE, write_object, [node_name(), key(), value()]},
-        {call, ?MODULE, read_object, [node_name(), key()]}
+        {call, ?MODULE, read_object, [node_name(), key()]},
+        {call, ?MODULE, leave_cluster, [node_name()]},
+        {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}
     ]).
 
 %% Picks whether a command should be valid under the current state.
+precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node]}) -> 
+    length(JoinedNodes) >= 3 andalso not lists:member(Node, JoinedNodes);
+precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node]}) -> 
+    length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
+precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
+    length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
+precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, write_object, [Node, _Key, _Value]}) -> 
+    length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
 precondition(#state{}, {call, _Mod, _Fun, _Args}) -> 
     true.
 
@@ -61,6 +77,15 @@ postcondition(#state{store=Store}, {call, ?MODULE, read_object, [_Node, Key]}, {
         _ ->
             false
     end;
+postcondition(_State, {call, ?MODULE, join_cluster, [_Node, _JoinedNodes]}, ok) ->
+    %% Accept leaves that succeed.
+    true;
+postcondition(_State, {call, ?MODULE, leave_cluster, [_Node]}, ok) ->
+    %% Accept leaves that succeed.
+    true;
+postcondition(_State, {call, ?MODULE, leave_cluster, [_Node]}, error) ->
+    %% Fail leaves that fail.
+    false;
 postcondition(_State, {call, ?MODULE, read_object, [_Node, _Key]}, {error, _}) -> 
     %% Fail timed out reads.
     false;
@@ -72,10 +97,15 @@ postcondition(_State, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {err
     false;
 postcondition(_State, {call, _Mod, _Fun, _Args}, _Res) -> 
     %% All other commands pass.
-    false.
+    true.
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
+next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
+    State#state{joined_nodes=JoinedNodes ++ [Node]};
+next_state(#state{joined_nodes=JoinedNodes0}=State, _Res, {call, ?MODULE, leave_cluster, [Node]}) -> 
+    JoinedNodes = JoinedNodes0 -- [Node],
+    State#state{joined_nodes=JoinedNodes};
 next_state(#state{store=Store0}=State, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
     Store = dict:store(Key, Value, Store0),
     State#state{store=Store};
@@ -142,3 +172,11 @@ write_object(Node, Key, Value) ->
 read_object(Node, Key) ->
     %% Perform write operation.
     rpc:call(Node, unir, fsm_get, [Key]).
+
+leave_cluster(Node) ->
+    %% Perform cluster leave.
+    rpc:call(Node, riak_core, leave, []).
+
+join_cluster(Node, JoinedNodes) ->
+    %% Perform cluster join.
+    ?SUPPORT:join_cluster(JoinedNodes ++ [Node]).
