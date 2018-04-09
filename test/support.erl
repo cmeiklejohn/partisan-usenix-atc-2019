@@ -763,15 +763,20 @@ bench_config() ->
 
 %% @private
 root_path(Config) ->
-    DataDir = proplists:get_value(data_dir, Config, ""),
-    DataDir ++ "../../../../../".
+    case proplists:get_value(data_dir, Config, undefined) of
+        undefined ->
+            WorkingDir = os:cmd("pwd"),
+            string:substr(WorkingDir, 1, length(WorkingDir) - 1) ++ "/";
+        DataDir ->
+            DataDir ++ "../../../../../"
+    end.
 
 %% @private
 root_dir(Config) ->
-    RootCommand = "cd " ++ root_path(Config) ++ "; pwd",
+    RootPath = root_path(Config),
+    RootCommand = "cd " ++ RootPath ++ "; pwd",
     RootOutput = os:cmd(RootCommand),
     RootDir = string:substr(RootOutput, 1, length(RootOutput) - 1) ++ "/",
-    %% ct:pal("RootDir: ~p", [RootDir]),
     RootDir.
 
 %% @private
