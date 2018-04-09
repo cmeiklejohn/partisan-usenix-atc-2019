@@ -39,7 +39,7 @@ initial_state() ->
     Store = dict:new(),
 
     %% Get the list of nodes.
-    Nodes = nodes(),
+    Nodes = names(),
 
     %% All nodes are assumed as joined.
     JoinedNodes = Nodes,
@@ -49,9 +49,9 @@ initial_state() ->
 command(#state{joined_nodes=JoinedNodes}) -> 
     oneof([
         {call, ?MODULE, write_object, [node_name(), key(), value()]},
-        {call, ?MODULE, read_object, [node_name(), key()]},
-        {call, ?MODULE, leave_cluster, [node_name()]},
-        {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}
+        {call, ?MODULE, read_object, [node_name(), key()]}
+        %% {call, ?MODULE, leave_cluster, [node_name()]}
+        %% {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}
     ]).
 
 %% Picks whether a command should be valid under the current state.
@@ -59,23 +59,31 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node]
     length(JoinedNodes) >= 3 andalso not lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node]}) -> 
     length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
-precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
+precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
     length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, write_object, [Node, _Key, _Value]}) -> 
     length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
 precondition(#state{}, {call, _Mod, _Fun, _Args}) -> 
-    true.
+    false.
 
 %% Given the state `State' *prior* to the call `{call, Mod, Fun, Args}',
 %% determine whether the result `Res' (coming from the actual system)
 %% makes sense.
 postcondition(#state{store=Store}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
+    ct:pal("read object returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
     case dict:find(Key, Store) of
         {ok, Value} ->
             true;
         _ ->
-            false
+            case Value of
+                not_found ->
+                    ct:pal("object wasn't written yet, not_found OK", []),
+                    true;
+                _ ->
+                    ct:pal("consistency violation, object was written", []),
+                    false
+            end
     end;
 postcondition(_State, {call, ?MODULE, join_cluster, [_Node, _JoinedNodes]}, ok) ->
     %% Accept leaves that succeed.
@@ -95,7 +103,8 @@ postcondition(_State, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok,
 postcondition(_State, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {error, _}) -> 
     %% Consider timeouts as failures for now.
     false;
-postcondition(_State, {call, _Mod, _Fun, _Args}, _Res) -> 
+postcondition(_State, {call, _Mod, _Fun, _Args}, Res) -> 
+    ct:pal("post condition fired with ~p", [Res]),
     %% All other commands pass.
     true.
 
@@ -121,7 +130,7 @@ node_name() ->
     ?LET(Names, names(), oneof(Names)).
 
 names() ->
-    lists:map(fun(N) -> "node_" ++ integer_to_list(N) end, lists:seq(1, ?NUM_NODES)).
+    lists:map(fun(N) -> list_to_atom("node_" ++ integer_to_list(N)) end, lists:seq(1, ?NUM_NODES)).
 
 key() ->
     oneof([<<"key">>]).
@@ -148,7 +157,15 @@ start_nodes() ->
                            {num_nodes, ?NUM_NODES},
                            {cluster_nodes, true}]),
 
+    %% Insert all nodes into group for all nodes.
+    ct:pal("Inserting ~p => ~p", [nodes, Nodes]),
     true = ets:insert(?MODULE, {nodes, Nodes}),
+
+    %% Insert name to node mappings.
+    lists:foreach(fun({Name, Node}) ->
+        ct:pal("Inserting ~p => ~p", [Name, Node]),
+        true = ets:insert(?MODULE, {Name, Node})
+    end, Nodes),
 
     ok.
 
@@ -166,17 +183,21 @@ stop_nodes() ->
     ok.
 
 write_object(Node, Key, Value) ->
-    %% Perform write operation.
-    rpc:call(Node, unir, fsm_put, [Key, Value]).
+    rpc:call(name_to_nodename(Node), unir, fsm_put, [Key, Value]).
 
 read_object(Node, Key) ->
-    %% Perform write operation.
-    rpc:call(Node, unir, fsm_get, [Key]).
+    ct:pal("read_object; node ~p key ~p", [Node, Key]),
+    rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
 leave_cluster(Node) ->
-    %% Perform cluster leave.
-    rpc:call(Node, riak_core, leave, []).
+    ct:pal("Leaving node from cluster.", [Node]),
+    Result = rpc:call(name_to_nodename(Node), riak_core, leave, []),
+    ct:pal("Leave completed."),
+    Result.
 
 join_cluster(Node, JoinedNodes) ->
-    %% Perform cluster join.
     ?SUPPORT:join_cluster(JoinedNodes ++ [Node]).
+
+name_to_nodename(Name) ->
+    [{_, NodeName}] = ets:lookup(?MODULE, Name),
+    NodeName.
