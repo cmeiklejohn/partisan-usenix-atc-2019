@@ -49,16 +49,16 @@ initial_state() ->
 command(#state{joined_nodes=_JoinedNodes}) -> 
     oneof([
         {call, ?MODULE, write_object, [node_name(), key(), value()]},
-        {call, ?MODULE, read_object, [node_name(), key()]}
-        %% {call, ?MODULE, leave_cluster, [node_name()]}
-        %% {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}
+        {call, ?MODULE, read_object, [node_name(), key()]},
+        {call, ?MODULE, leave_cluster, [node_name()]}
+        % {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}
     ]).
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node]}) -> 
     enough_nodes_connected(JoinedNodes) andalso not lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node]}) -> 
-    enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
+    enough_nodes_connected_to_issue_remove(JoinedNodes) andalso lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
     enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, write_object, [Node, _Key, _Value]}) -> 
@@ -196,7 +196,7 @@ read_object(Node, Key) ->
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
 leave_cluster(Node) ->
-    debug("leave_cluster: leaving node from cluster.", [Node]),
+    debug("leave_cluster: leaving node from cluster: ~p", [Node]),
     rpc:call(name_to_nodename(Node), riak_core, leave, []).
 
 join_cluster(Node, JoinedNodes) ->
@@ -208,6 +208,9 @@ name_to_nodename(Name) ->
 
 enough_nodes_connected(Nodes) ->
     length(Nodes) >= 3.
+
+enough_nodes_connected_to_issue_remove(Nodes) ->
+    length(Nodes) > 3.
 
 debug(Line, Args) ->
     ct:pal(Line, Args).
