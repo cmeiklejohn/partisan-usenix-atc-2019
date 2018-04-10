@@ -46,7 +46,7 @@ initial_state() ->
 
     #state{joined_nodes=JoinedNodes, nodes=Nodes, store=Store}.
 
-command(#state{joined_nodes=JoinedNodes}) -> 
+command(#state{joined_nodes=_JoinedNodes}) -> 
     oneof([
         {call, ?MODULE, write_object, [node_name(), key(), value()]},
         {call, ?MODULE, read_object, [node_name(), key()]}
@@ -56,32 +56,34 @@ command(#state{joined_nodes=JoinedNodes}) ->
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node]}) -> 
-    length(JoinedNodes) >= 3 andalso not lists:member(Node, JoinedNodes);
+    enough_nodes_connected(JoinedNodes) andalso not lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node]}) -> 
-    length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
-precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
-    length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
+    enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
+precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
+    enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, write_object, [Node, _Key, _Value]}) -> 
-    length(JoinedNodes) >= 3 andalso lists:member(Node, JoinedNodes);
+    enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
 precondition(#state{}, {call, _Mod, _Fun, _Args}) -> 
+    debug("general precondition fired", []),
     false.
 
 %% Given the state `State' *prior* to the call `{call, Mod, Fun, Args}',
 %% determine whether the result `Res' (coming from the actual system)
 %% makes sense.
 postcondition(#state{store=Store}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
-    ct:pal("read object returned key ~p value ~p", [Key, Value]),
+    debug("read_object: returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
     case dict:find(Key, Store) of
         {ok, Value} ->
+            debug("read_object: value read was written, OK", []),
             true;
         _ ->
             case Value of
                 not_found ->
-                    ct:pal("object wasn't written yet, not_found OK", []),
+                    debug("read_object: object wasn't written yet, not_found OK", []),
                     true;
                 _ ->
-                    ct:pal("consistency violation, object was written", []),
+                    debug("read_object: consistency violation, object was not written but was read", []),
                     false
             end
     end;
@@ -104,17 +106,16 @@ postcondition(_State, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {err
     %% Consider timeouts as failures for now.
     false;
 postcondition(_State, {call, _Mod, _Fun, _Args}, Res) -> 
-    ct:pal("post condition fired with ~p", [Res]),
+    debug("general postcondition fired with response ~p", [Res]),
     %% All other commands pass.
-    true.
+    false.
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     State#state{joined_nodes=JoinedNodes ++ [Node]};
-next_state(#state{joined_nodes=JoinedNodes0}=State, _Res, {call, ?MODULE, leave_cluster, [Node]}) -> 
-    JoinedNodes = JoinedNodes0 -- [Node],
-    State#state{joined_nodes=JoinedNodes};
+next_state(#state{joined_nodes=JoinedNodes}=State, _Res, {call, ?MODULE, leave_cluster, [Node]}) -> 
+    State#state{joined_nodes=JoinedNodes -- [Node]};
 next_state(#state{store=Store0}=State, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
     Store = dict:store(Key, Value, Store0),
     State#state{store=Store};
@@ -147,7 +148,11 @@ start_nodes() ->
     ?MODULE = ets:new(?MODULE, [named_table]),
 
     %% Special configuration for the cluster.
-    Config = [{partisan_dispatch, true}],
+    Config = [{partisan_dispatch, true},
+              {parallelism, 1},
+              {tls, false},
+              {binary_padding, false},
+              {vnode_partitioning, false}],
 
     %% Initialize a cluster.
     Nodes = ?SUPPORT:start(scale_test,
@@ -158,12 +163,12 @@ start_nodes() ->
                            {cluster_nodes, true}]),
 
     %% Insert all nodes into group for all nodes.
-    ct:pal("Inserting ~p => ~p", [nodes, Nodes]),
     true = ets:insert(?MODULE, {nodes, Nodes}),
 
-    %% Insert name to node mappings.
+    %% Insert name to node mappings for lookup.
+    %% Caveat, because sometimes we won't know ahead of time what FQDN the node will
+    %% come online with when using partisan.
     lists:foreach(fun({Name, Node}) ->
-        ct:pal("Inserting ~p => ~p", [Name, Node]),
         true = ets:insert(?MODULE, {Name, Node})
     end, Nodes),
 
@@ -183,17 +188,16 @@ stop_nodes() ->
     ok.
 
 write_object(Node, Key, Value) ->
+    debug("write_object: node ~p key ~p value ~p", [Node, Key, Value]),
     rpc:call(name_to_nodename(Node), unir, fsm_put, [Key, Value]).
 
 read_object(Node, Key) ->
-    ct:pal("read_object; node ~p key ~p", [Node, Key]),
+    debug("read_object: node ~p key ~p", [Node, Key]),
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
 leave_cluster(Node) ->
-    ct:pal("Leaving node from cluster.", [Node]),
-    Result = rpc:call(name_to_nodename(Node), riak_core, leave, []),
-    ct:pal("Leave completed."),
-    Result.
+    debug("leave_cluster: leaving node from cluster.", [Node]),
+    rpc:call(name_to_nodename(Node), riak_core, leave, []).
 
 join_cluster(Node, JoinedNodes) ->
     ?SUPPORT:join_cluster(JoinedNodes ++ [Node]).
@@ -201,3 +205,9 @@ join_cluster(Node, JoinedNodes) ->
 name_to_nodename(Name) ->
     [{_, NodeName}] = ets:lookup(?MODULE, Name),
     NodeName.
+
+enough_nodes_connected(Nodes) ->
+    length(Nodes) >= 3.
+
+debug(Line, Args) ->
+    ct:pal(Line, Args).
