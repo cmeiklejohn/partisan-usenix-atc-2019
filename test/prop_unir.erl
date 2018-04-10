@@ -19,7 +19,7 @@
          postcondition/3]).
 
 prop_test() ->
-    ?FORALL(Cmds, commands(?MODULE), 
+    ?FORALL(Cmds, more_commands(10, commands(?MODULE)), 
         begin
             start_nodes(),
             {History, State, Result} = run_commands(?MODULE, Cmds), 
