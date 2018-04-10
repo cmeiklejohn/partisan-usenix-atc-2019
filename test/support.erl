@@ -366,7 +366,7 @@ owners_according_to(Node) ->
             % lager:info("Owners according to ~p: ~p", [Node, lists:usort(Owners)]),
             lists:usort(Owners);
         {badrpc, _}=BadRpc ->
-            lager:info("Badrpc"),
+            lager:info("Badrpc: ~p", [BadRpc]),
             BadRpc
     end.
 
