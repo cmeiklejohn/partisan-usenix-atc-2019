@@ -58,8 +58,21 @@ command(#state{joined_nodes=JoinedNodes}) ->
     ]).
 
 %% Picks whether a command should be valid under the current state.
-precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
-    enough_nodes_connected(JoinedNodes) andalso not is_joined(Node, JoinedNodes);
+precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
+    %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
+    ToBeJoined = Nodes -- JoinedNodes,
+
+    try
+        case hd(ToBeJoined) of
+            Node ->
+                true;
+            _ ->
+                false
+        end
+    catch
+    _:_ ->
+        false
+    end;
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the last node in the join list, for ease of debugging.
     case lists:last(JoinedNodes) of
@@ -120,12 +133,13 @@ postcondition(_State, {call, _Mod, _Fun, _Args}, Res) ->
 %% accordingly for the test to proceed.
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     State#state{joined_nodes=JoinedNodes ++ [Node]};
-next_state(#state{joined_nodes=JoinedNodes}=State, _Res, {call, ?MODULE, leave_cluster, [Node]}) -> 
+next_state(#state{joined_nodes=JoinedNodes}=State, _Res, {call, ?MODULE, leave_cluster, [Node, JoinedNodes]}) -> 
     State#state{joined_nodes=JoinedNodes -- [Node]};
 next_state(#state{store=Store0}=State, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
     Store = dict:store(Key, Value, Store0),
     State#state{store=Store};
 next_state(State, _Res, {call, _Mod, _Fun, _Args}) -> 
+    debug("general next_state fired", []),
     NewState = State,
     NewState.
 
