@@ -12,6 +12,9 @@
 
 -define(SUPPORT, support).
 
+-define(NUM_NODES, 5).
+-define(COMMAND_MULTIPLE, 1).
+
 -export([command/1, 
          initial_state/0, 
          next_state/3,
@@ -19,7 +22,7 @@
          postcondition/3]).
 
 prop_test() ->
-    ?FORALL(Cmds, more_commands(10, commands(?MODULE)), 
+    ?FORALL(Cmds, more_commands(?COMMAND_MULTIPLE, commands(?MODULE)), 
         begin
             start_nodes(),
             {History, State, Result} = run_commands(?MODULE, Cmds), 
@@ -31,8 +34,6 @@ prop_test() ->
 
 -record(state, {joined_nodes, nodes, store}).
 
--define(NUM_NODES, 5).
-
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
     %% Initialize empty dictionary for process state.
@@ -41,11 +42,11 @@ initial_state() ->
     %% Get the list of nodes.
     Nodes = names(),
 
-    %% All nodes are assumed as joined.
-    JoinedNodes = Nodes,
+    %% Assume first is joined -- node_1 will be the join point.
+    JoinedNodes = [hd(Nodes)],
 
     %% Debug message.
-    debug("initial_state: nodes ~p", [Nodes]),
+    debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
 
     #state{joined_nodes=JoinedNodes, nodes=Nodes, store=Store}.
 
@@ -53,25 +54,33 @@ command(#state{joined_nodes=JoinedNodes}) ->
     frequency([
         %% {10, {call, ?MODULE, write_object, [node_name(), key(), value()]}},
         %% {10, {call, ?MODULE, read_object, [node_name(), key()]}},
-        {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}},
+        %% {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}},
         {1, {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}}
     ]).
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
-    ToBeJoined = Nodes -- JoinedNodes,
+    debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
 
-    try
-        case hd(ToBeJoined) of
-            Node ->
-                true;
-            _ ->
-                false
-        end
-    catch
-    _:_ ->
-        false
+    ToBeJoinedNodes = Nodes -- JoinedNodes,
+    debug("precondition join_cluster: remaining nodes to be joined are: ~p", [ToBeJoinedNodes]),
+
+    case length(ToBeJoinedNodes) > 0 of
+        true ->
+            ToBeJoinedNode = hd(ToBeJoinedNodes),
+            debug("precondition join_cluster: attempting to join ~p", [ToBeJoinedNode]),
+            case ToBeJoinedNode of
+                Node ->
+                    debug("precondition join_cluster: YES attempting to join ~p is ~p", [ToBeJoinedNode, Node]),
+                    true;
+                OtherNode ->
+                    debug("precondition join_cluster: NO attempting to join ~p not ~p", [ToBeJoinedNode, OtherNode]),
+                    false
+            end;
+        false ->
+            debug("precondition join_cluster: no nodes left to join.", []),
+            true
     end;
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the last node in the join list, for ease of debugging.
@@ -82,9 +91,9 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
             false
     end;
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, read_object, [Node, _Key]}) -> 
-    enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
+    enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes);
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, write_object, [Node, _Key, _Value]}) -> 
-    enough_nodes_connected(JoinedNodes) andalso lists:member(Node, JoinedNodes);
+    enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes);
 precondition(#state{}, {call, _Mod, _Fun, _Args}) -> 
     debug("general precondition fired", []),
     false.
@@ -132,7 +141,14 @@ postcondition(_State, {call, _Mod, _Fun, _Args}, Res) ->
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
-    State#state{joined_nodes=JoinedNodes ++ [Node]};
+    case is_joined(Node, JoinedNodes) of
+        true ->
+            %% no-op for the join
+            State;
+        false ->
+            %% add to the joined list.
+            State#state{joined_nodes=JoinedNodes ++ [Node]}
+    end;
 next_state(#state{joined_nodes=JoinedNodes}=State, _Res, {call, ?MODULE, leave_cluster, [Node, JoinedNodes]}) -> 
     State#state{joined_nodes=JoinedNodes -- [Node]};
 next_state(#state{store=Store0}=State, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
@@ -180,7 +196,7 @@ start_nodes() ->
                            [{partisan_peer_service_manager,
                                partisan_default_peer_service_manager},
                            {num_nodes, ?NUM_NODES},
-                           {cluster_nodes, true}]),
+                           {cluster_nodes, false}]),
 
     %% Insert all nodes into group for all nodes.
     true = ets:insert(?MODULE, {nodes, Nodes}),
@@ -215,53 +231,58 @@ read_object(Node, Key) ->
     debug("read_object: node ~p key ~p", [Node, Key]),
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
-leave_cluster(Name, JoinedNames) ->
+leave_cluster(Name, _JoinedNames) ->
     Node = name_to_nodename(Name),
     debug("leave_cluster: leaving node ~p from cluster", [Node]),
 
-    %% Issue remove.
-    ok = ?SUPPORT:leave(Node),
+    % %% Issue remove.
+    % ok = ?SUPPORT:leave(Node),
 
-    %% Verify appropriate number of connections.
-    NewCluster = lists:map(fun name_to_nodename/1, JoinedNames -- [Name]),
+    % %% Verify appropriate number of connections.
+    % NewCluster = lists:map(fun name_to_nodename/1, JoinedNames -- [Name]),
 
-    %% Ensure each node owns a portion of the ring
-    ConvergeFun = fun() ->
-        ok = ?SUPPORT:wait_until_all_connections(NewCluster),
-        ok = ?SUPPORT:wait_until_nodes_agree_about_ownership(NewCluster),
-        ok = ?SUPPORT:wait_until_no_pending_changes(NewCluster),
-        ok = ?SUPPORT:wait_until_ring_converged(NewCluster)
-    end,
-    {ConvergeTime, _} = timer:tc(ConvergeFun),
+    % %% Ensure each node owns a portion of the ring
+    % ConvergeFun = fun() ->
+    %     ok = ?SUPPORT:wait_until_all_connections(NewCluster),
+    %     ok = ?SUPPORT:wait_until_nodes_agree_about_ownership(NewCluster),
+    %     ok = ?SUPPORT:wait_until_no_pending_changes(NewCluster),
+    %     ok = ?SUPPORT:wait_until_ring_converged(NewCluster)
+    % end,
+    % {ConvergeTime, _} = timer:tc(ConvergeFun),
 
-    debug("leave_cluster: converged at ~p", [ConvergeTime]),
+    % debug("leave_cluster: converged at ~p", [ConvergeTime]),
     ok.
 
 join_cluster(Name, [JoinedName|_]=JoinedNames) ->
-    Node = name_to_nodename(Name),
-    JoinedNode = name_to_nodename(JoinedName),
-    debug("join_cluster: joining node ~p to node ~p", [Node, JoinedNode]),
+    case is_joined(Name, JoinedNames) of
+        true ->
+            ok;
+        false ->
+            Node = name_to_nodename(Name),
+            JoinedNode = name_to_nodename(JoinedName),
+            debug("join_cluster: joining node ~p to node ~p", [Node, JoinedNode]),
 
-    %% Stage join.
-    ok = ?SUPPORT:staged_join(Node, JoinedNode),
+            %% Stage join.
+            ok = ?SUPPORT:staged_join(Node, JoinedNode),
 
-    %% Plan will only succeed once the ring has been gossiped.
-    ok = ?SUPPORT:plan_and_commit(JoinedNode),
+            %% Plan will only succeed once the ring has been gossiped.
+            ok = ?SUPPORT:plan_and_commit(JoinedNode),
 
-    %% Verify appropriate number of connections.
-    NewCluster = lists:map(fun name_to_nodename/1, JoinedNames ++ [Name]),
+            %% Verify appropriate number of connections.
+            NewCluster = lists:map(fun name_to_nodename/1, JoinedNames ++ [Name]),
 
-    %% Ensure each node owns a portion of the ring
-    ConvergeFun = fun() ->
-        ok = ?SUPPORT:wait_until_all_connections(NewCluster),
-        ok = ?SUPPORT:wait_until_nodes_agree_about_ownership(NewCluster),
-        ok = ?SUPPORT:wait_until_no_pending_changes(NewCluster),
-        ok = ?SUPPORT:wait_until_ring_converged(NewCluster)
-    end,
-    {ConvergeTime, _} = timer:tc(ConvergeFun),
+            %% Ensure each node owns a portion of the ring
+            ConvergeFun = fun() ->
+                ok = ?SUPPORT:wait_until_all_connections(NewCluster),
+                ok = ?SUPPORT:wait_until_nodes_agree_about_ownership(NewCluster),
+                ok = ?SUPPORT:wait_until_no_pending_changes(NewCluster),
+                ok = ?SUPPORT:wait_until_ring_converged(NewCluster)
+            end,
+            {ConvergeTime, _} = timer:tc(ConvergeFun),
 
-    debug("join_cluster: converged at ~p", [ConvergeTime]),
-    ok.
+            debug("join_cluster: converged at ~p", [ConvergeTime]),
+            ok
+    end.
 
 name_to_nodename(Name) ->
     [{_, NodeName}] = ets:lookup(?MODULE, Name),
