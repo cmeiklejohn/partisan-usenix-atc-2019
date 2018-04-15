@@ -67,49 +67,49 @@ command(State) ->
 %% Picks whether a command should be valid under the current state.
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
-    debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
+    %% debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
 
     ToBeJoinedNodes = Nodes -- JoinedNodes,
-    debug("precondition join_cluster: remaining nodes to be joined are: ~p", [ToBeJoinedNodes]),
+    %% debug("precondition join_cluster: remaining nodes to be joined are: ~p", [ToBeJoinedNodes]),
 
     case length(ToBeJoinedNodes) > 0 of
         true ->
             ToBeJoinedNode = hd(ToBeJoinedNodes),
-            debug("precondition join_cluster: attempting to join ~p", [ToBeJoinedNode]),
+            %% debug("precondition join_cluster: attempting to join ~p", [ToBeJoinedNode]),
             case ToBeJoinedNode of
                 Node ->
-                    debug("precondition join_cluster: YES attempting to join ~p is ~p", [ToBeJoinedNode, Node]),
+                    %% debug("precondition join_cluster: YES attempting to join ~p is ~p", [ToBeJoinedNode, Node]),
                     true;
-                OtherNode ->
-                    debug("precondition join_cluster: NO attempting to join ~p not ~p", [ToBeJoinedNode, OtherNode]),
+                _OtherNode ->
+                    %% debug("precondition join_cluster: NO attempting to join ~p not ~p", [ToBeJoinedNode, OtherNode]),
                     false
             end;
         false ->
-            debug("precondition join_cluster: no nodes left to join.", []),
-            true
+            %% debug("precondition join_cluster: no nodes left to join.", []),
+            false %% Might need to be changed when there's no read/write operations.
     end;
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the last node in the join list, for ease of debugging.
-    debug("precondition leave_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
+    %% debug("precondition leave_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
 
     ToBeRemovedNodes = JoinedNodes,
-    debug("precondition leave_cluster: remaining nodes to be removed are: ~p", [ToBeRemovedNodes]),
+    %% debug("precondition leave_cluster: remaining nodes to be removed are: ~p", [ToBeRemovedNodes]),
 
     case length(ToBeRemovedNodes) > 3 of
         true ->
             ToBeRemovedNode = lists:last(ToBeRemovedNodes),
-            debug("precondition leave_cluster: attempting to leave ~p", [ToBeRemovedNode]),
+            %% debug("precondition leave_cluster: attempting to leave ~p", [ToBeRemovedNode]),
             case ToBeRemovedNode of
                 Node ->
-                    debug("precondition leave_cluster: YES attempting to leave ~p is ~p", [ToBeRemovedNode, Node]),
+                    %% debug("precondition leave_cluster: YES attempting to leave ~p is ~p", [ToBeRemovedNode, Node]),
                     true;
-                OtherNode ->
-                    debug("precondition leave_cluster: NO attempting to leave ~p not ~p", [ToBeRemovedNode, OtherNode]),
+                _OtherNode ->
+                    %% debug("precondition leave_cluster: NO attempting to leave ~p not ~p", [ToBeRemovedNode, OtherNode]),
                     false
             end;
         false ->
-            debug("precondition leave_cluster: no nodes left to remove.", []),
-            true
+            %% debug("precondition leave_cluster: no nodes left to remove.", []),
+            false %% Might need to be changed when there's no read/write operations.
     end;
 precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, _Mod, Fun, [Node|_]=_Args}=Call) -> 
     case lists:member(Fun, vnode_functions()) of
