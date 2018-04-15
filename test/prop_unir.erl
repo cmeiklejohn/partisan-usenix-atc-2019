@@ -21,11 +21,22 @@
          precondition/2, 
          postcondition/3]).
 
-prop_test() ->
+prop_sequential() ->
     ?FORALL(Cmds, more_commands(?COMMAND_MULTIPLE, commands(?MODULE)), 
         begin
             start_nodes(),
             {History, State, Result} = run_commands(?MODULE, Cmds), 
+            stop_nodes(),
+            ?WHENFAIL(io:format("History: ~p\nState: ~p\nResult: ~p\n",
+                                [History,State,Result]),
+                      aggregate(command_names(Cmds), Result =:= ok))
+        end).
+
+prop_parallel() ->
+    ?FORALL(Cmds, more_commands(?COMMAND_MULTIPLE, parallel_commands(?MODULE)), 
+        begin
+            start_nodes(),
+            {History, State, Result} = run_parallel_commands(?MODULE, Cmds), 
             stop_nodes(),
             ?WHENFAIL(io:format("History: ~p\nState: ~p\nResult: ~p\n",
                                 [History,State,Result]),
@@ -103,6 +114,7 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
 precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, _Mod, Fun, [Node|_]=_Args}=Call) -> 
     case lists:member(Fun, vnode_functions()) of
         true ->
+            debug("precondition fired for vnode function: ~p", [Fun]),
             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
             ClusterCondition andalso vnode_precondition(VnodeState, Call);
         false ->
