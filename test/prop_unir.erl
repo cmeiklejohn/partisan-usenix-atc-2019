@@ -14,6 +14,7 @@
 
 -define(NUM_NODES, 4).
 -define(COMMAND_MULTIPLE, 1).
+-define(CLUSTER_NODES, true).
 
 -export([command/1, 
          initial_state/0, 
@@ -54,7 +55,12 @@ initial_state() ->
     Nodes = names(),
 
     %% Assume first is joined -- node_1 will be the join point.
-    JoinedNodes = [hd(Nodes)],
+    JoinedNodes = case ?CLUSTER_NODES of
+        false ->
+            [hd(Nodes)];
+        true ->
+            Nodes
+    end,
 
     %% Debug message.
     debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
@@ -233,7 +239,7 @@ start_nodes() ->
                            [{partisan_peer_service_manager,
                                partisan_default_peer_service_manager},
                            {num_nodes, ?NUM_NODES},
-                           {cluster_nodes, false}]),
+                           {cluster_nodes, ?CLUSTER_NODES}]),
 
     %% Insert all nodes into group for all nodes.
     true = ets:insert(?MODULE, {nodes, Nodes}),
