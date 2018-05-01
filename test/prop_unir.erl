@@ -194,7 +194,7 @@ next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, 
     MessageFilters = dict:store({SourceNode, DestinationNode}, true, MessageFilters0),
     State#state{message_filters=MessageFilters};
 next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, remove_message_filter, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = dict:delete({SourceNode, DestinationNode}, true, MessageFilters0),
+    MessageFilters = dict:delete({SourceNode, DestinationNode}, MessageFilters0),
     State#state{message_filters=MessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
