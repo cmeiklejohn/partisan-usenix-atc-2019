@@ -15,6 +15,7 @@
 -define(NUM_NODES, 4).
 -define(COMMAND_MULTIPLE, 1).
 -define(CLUSTER_NODES, true).
+-define(MANAGER, partisan_default_peer_service_manager).
 
 -export([command/1, 
          initial_state/0, 
@@ -44,7 +45,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, vnode_state}).
+-record(state, {joined_nodes, nodes, vnode_state, message_filters}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -62,15 +63,25 @@ initial_state() ->
             Nodes
     end,
 
+    %% Message filters.
+    MessageFilters = dict:new(),
+
     %% Debug message.
     debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
 
-    #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState}.
+    #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState, message_filters=MessageFilters}.
 
 command(State) -> 
     ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, add_message_filter, [SourceNode, DestinationNode]}) -> 
+    case dict:find({SourceNode, DestinationNode}, MessageFilters) of
+        error ->
+            true;
+        _ ->
+            false
+    end;
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
     %% debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
@@ -151,6 +162,14 @@ postcondition(#state{vnode_state=VnodeState}, {call, ?MODULE, read_object, [_Nod
                     false
             end
     end;
+postcondition(_State, {call, ?MODULE, add_message_filter, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition add_message_filter: succeeded", []),
+    %% Added message filter.
+    true;
+postcondition(_State, {call, ?MODULE, remove_message_filter, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition remove_message_filter: succeeded", []),
+    %% Removed message filter.
+    true;
 postcondition(_State, {call, ?MODULE, join_cluster, [_Node, _JoinedNodes]}, ok) ->
     debug("postcondition join_cluster: succeeded", []),
     %% Accept joins that succeed.
@@ -171,6 +190,12 @@ postcondition(#state{vnode_state=VnodeState}, {call, _Mod, Fun, _Args}=Call, Res
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, add_message_filter, [SourceNode, DestinationNode]}) -> 
+    MessageFilters = dict:store({SourceNode, DestinationNode}, true, MessageFilters0),
+    State#state{message_filters=MessageFilters};
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, remove_message_filter, [SourceNode, DestinationNode]}) -> 
+    MessageFilters = dict:delete({SourceNode, DestinationNode}, true, MessageFilters0),
+    State#state{message_filters=MessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
         true ->
@@ -274,6 +299,14 @@ read_object(Node, Key) ->
     debug("read_object: node ~p key ~p", [Node, Key]),
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
+add_message_filter(SourceNode, DestinationNode) ->
+    debug("add_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [DestinationNode]).
+
+remove_message_filter(SourceNode, DestinationNode) ->
+    debug("remove_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [DestinationNode]).
+
 leave_cluster(Name, JoinedNames) ->
     Node = name_to_nodename(Name),
     debug("leave_cluster: leaving node ~p from cluster with members ~p", [Node, JoinedNames]),
@@ -351,7 +384,9 @@ is_joined(Node, Cluster) ->
 cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     [
      {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]},
-     {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}
+     {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]},
+     {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
+     {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}
     ].
 
 %%%===================================================================
