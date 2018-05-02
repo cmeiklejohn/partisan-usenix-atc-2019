@@ -16,6 +16,7 @@
 -define(COMMAND_MULTIPLE, 1).
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
+-define(PERFORM_LEAVES_AND_JOINS, false).
 
 -export([command/1, 
          initial_state/0, 
@@ -141,8 +142,7 @@ precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mo
             debug("precondition fired for vnode function: ~p", [Fun]),
             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
             VnodePrecondition = vnode_precondition(VnodeState, Call),
-            debug("precondition fired for vnode function: ~p, ClusterCondition: ~p, VnodeCondition: ~p", 
-                  [Fun, ClusterCondition, VnodePrecondition]),
+            debug("precondition fired for vnode function: ~p", [Fun]),
             ClusterCondition andalso VnodePrecondition;
         false ->
             debug("general precondition fired for mod ~p and fun ~p and args ~p", [Mod, Fun, Args]),
@@ -389,12 +389,23 @@ is_joined(Node, Cluster) ->
     lists:member(Node, Cluster).
 
 cluster_commands(#state{joined_nodes=JoinedNodes}) ->
-    [
-     {1, {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}},
-     {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}},
-     {5, {call, ?MODULE, add_message_filter, [node_name(), node_name()]}},
-     {5, {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}}
-    ].
+    MemberCommands = case ?PERFORM_LEAVES_AND_JOINS of
+        true ->
+            [
+             {1, {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}},
+             {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}}
+            ];
+        false ->
+            []
+    end,
+
+    PartitionCommands = 
+        [
+        {5, {call, ?MODULE, add_message_filter, [node_name(), node_name()]}},
+        {5, {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}}
+        ],
+
+    MemberCommands ++ PartitionCommands.
 
 %%%===================================================================
 %%% Vnode Functions
@@ -403,7 +414,7 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 %% What vnode-specific operations should be called.
 vnode_commands() ->
     [
-     {20, {call, ?MODULE, read_object, [node_name(), key()]}},
+     {10, {call, ?MODULE, read_object, [node_name(), key()]}},
      {10, {call, ?MODULE, write_object, [node_name(), key(), value()]}}
     ].
 

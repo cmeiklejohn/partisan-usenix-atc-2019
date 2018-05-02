@@ -17,7 +17,7 @@ release: compile
 	[ -f $(RELPATH)/../unir_config/unir.conf ] || cp $(RELPATH)/etc/unir.conf  $(RELPATH)/../unir_config/unir.conf
 	[ -f $(RELPATH)/../unir_config/advanced.config ] || cp $(RELPATH)/etc/advanced.config  $(RELPATH)/../unir_config/advanced.config
 
-sequential-test: release
+proper: release kill
 	$(REBAR) proper -m prop_unir -p prop_sequential
 
 kill:
@@ -34,9 +34,6 @@ logs:
 
 tail-logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs tail -F
-
-proper: kill
-	$(REBAR) proper
 
 echo-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
