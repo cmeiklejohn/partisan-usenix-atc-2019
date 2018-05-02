@@ -144,7 +144,7 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
 precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
     case lists:member(Fun, vnode_functions()) of
         true ->
-            debug("precondition fired for vnode function: ~p", [Fun]),
+            %% debug("precondition fired for vnode function: ~p", [Fun]),
             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
             VnodePrecondition = vnode_precondition(VnodeState, Call),
             debug("precondition fired for vnode function: ~p", [Fun]),
