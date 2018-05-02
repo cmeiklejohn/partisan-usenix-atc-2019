@@ -213,6 +213,17 @@ start(_Case, Config, Options) ->
                     ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, false])
             end,
 
+            %% Configure vnode partitioning in Riak Core.
+            DisableFastForward = ?config(disable_fast_forward, Config),
+            case DisableFastForward of
+                true ->
+                    % ct:pal("Disabling fast forward."),
+                    ok = rpc:call(Node, partisan_config, set, [disable_fast_forward, DisableFastForward]);
+                _ ->
+                    % ct:pal("Enabling fast forward."),
+                    ok = rpc:call(Node, partisan_config, set, [disable_fast_forward, false])
+            end,
+
             %% Get parallelism factor.
             Parallelism = ?config(parallelism, Config),
             case Parallelism of

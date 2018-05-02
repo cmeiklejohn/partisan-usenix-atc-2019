@@ -73,13 +73,18 @@ initial_state() ->
     #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState, message_filters=MessageFilters}.
 
 command(State) -> 
-    ?LET(Commands, cluster_commands(State) ++ vnode_commands(), frequency(Commands)).
+    ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, add_message_filter, [SourceNode, DestinationNode]}) -> 
     case dict:find({SourceNode, DestinationNode}, MessageFilters) of
         error ->
-            true;
+            case SourceNode of
+                DestinationNode ->
+                    false;
+                _ ->
+                    true
+            end;
         _ ->
             false
     end;
@@ -201,7 +206,7 @@ next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, 
     MessageFilters = dict:store({SourceNode, DestinationNode}, true, MessageFilters0),
     State#state{message_filters=MessageFilters};
 next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, remove_message_filter, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = dict:delete({SourceNode, DestinationNode}, MessageFilters0),
+    MessageFilters = dict:erase({SourceNode, DestinationNode}, MessageFilters0),
     State#state{message_filters=MessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
@@ -263,7 +268,8 @@ start_nodes() ->
               {parallelism, 1},
               {tls, false},
               {binary_padding, false},
-              {vnode_partitioning, false}],
+              {vnode_partitioning, false},
+              {disable_fast_forward, true}],
 
     %% Initialize a cluster.
     Nodes = ?SUPPORT:start(scale_test,
@@ -392,8 +398,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     MemberCommands = case ?PERFORM_LEAVES_AND_JOINS of
         true ->
             [
-             {1, {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}},
-             {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}}
+            {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]},
+            {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}
             ];
         false ->
             []
@@ -401,8 +407,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 
     PartitionCommands = 
         [
-        {5, {call, ?MODULE, add_message_filter, [node_name(), node_name()]}},
-        {5, {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}}
+        {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
+        {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}
         ],
 
     MemberCommands ++ PartitionCommands.
@@ -414,8 +420,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 %% What vnode-specific operations should be called.
 vnode_commands() ->
     [
-     {10, {call, ?MODULE, read_object, [node_name(), key()]}},
-     {10, {call, ?MODULE, write_object, [node_name(), key(), value()]}}
+     {call, ?MODULE, read_object, [node_name(), key()]},
+     {call, ?MODULE, write_object, [node_name(), key(), value()]}
     ].
 
 %% What should the initial vnode state be.
@@ -425,7 +431,7 @@ vnode_initial_state() ->
 %% Names of the vnode functions so we kow when we can dispatch to the vnode
 %% pre- and postconditions.
 vnode_functions() ->
-    lists:map(fun({_, {call, _Mod, Fun, _Args}}) -> Fun end, vnode_commands()).
+    lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, vnode_commands()).
 
 %% Postconditions for vnode commands.
 vnode_postcondition(_VnodeState, {call, ?MODULE, read_object, [_Node, _Key]}, {error, _}) -> 
