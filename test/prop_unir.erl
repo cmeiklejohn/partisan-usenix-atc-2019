@@ -72,7 +72,7 @@ initial_state() ->
     #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState, message_filters=MessageFilters}.
 
 command(State) -> 
-    ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
+    ?LET(Commands, cluster_commands(State) ++ vnode_commands(), frequency(Commands)).
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, add_message_filter, [SourceNode, DestinationNode]}) -> 
@@ -390,10 +390,10 @@ is_joined(Node, Cluster) ->
 
 cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     [
-     {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]},
-     {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]},
-     {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
-     {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}
+     {1, {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}},
+     {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}},
+     {1, {call, ?MODULE, add_message_filter, [node_name(), node_name()]}},
+     {1, {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}}
     ].
 
 %%%===================================================================
@@ -403,8 +403,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 %% What vnode-specific operations should be called.
 vnode_commands() ->
     [
-     {call, ?MODULE, read_object, [node_name(), key()]},
-     {call, ?MODULE, write_object, [node_name(), key(), value()]}
+     {10, {call, ?MODULE, read_object, [node_name(), key()]}},
+     {2, {call, ?MODULE, write_object, [node_name(), key(), value()]}}
     ].
 
 %% What should the initial vnode state be.
@@ -414,7 +414,7 @@ vnode_initial_state() ->
 %% Names of the vnode functions so we kow when we can dispatch to the vnode
 %% pre- and postconditions.
 vnode_functions() ->
-    lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, vnode_commands()).
+    lists:map(fun({_, {call, _Mod, Fun, _Args}}) -> Fun end, vnode_commands()).
 
 %% Postconditions for vnode commands.
 vnode_postcondition(_VnodeState, {call, ?MODULE, read_object, [_Node, _Key]}, {error, _}) -> 
