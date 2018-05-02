@@ -82,6 +82,13 @@ precondition(#state{message_filters=MessageFilters}, {call, _Mod, add_message_fi
         _ ->
             false
     end;
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, remove_message_filter, [SourceNode, DestinationNode]}) -> 
+    case dict:find({SourceNode, DestinationNode}, MessageFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end;
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
     %% debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
@@ -128,7 +135,7 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
             %% debug("precondition leave_cluster: no nodes left to remove.", []),
             false %% Might need to be changed when there's no read/write operations.
     end;
-precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, _Mod, Fun, [Node|_]=_Args}=Call) -> 
+precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
     case lists:member(Fun, vnode_functions()) of
         true ->
             debug("precondition fired for vnode function: ~p", [Fun]),
@@ -138,7 +145,7 @@ precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, _M
                   [Fun, ClusterCondition, VnodePrecondition]),
             ClusterCondition andalso VnodePrecondition;
         false ->
-            debug("general precondition fired", []),
+            debug("general precondition fired for mod ~p and fun ~p and args ~p", [Mod, Fun, Args]),
             false
     end.
 
