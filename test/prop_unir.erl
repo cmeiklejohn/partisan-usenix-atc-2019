@@ -156,23 +156,6 @@ precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mo
 %% Given the state `State' *prior* to the call `{call, Mod, Fun, Args}',
 %% determine whether the result `Res' (coming from the actual system)
 %% makes sense.
-postcondition(#state{vnode_state=VnodeState}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
-    debug("read_object: returned key ~p value ~p", [Key, Value]),
-    %% Only pass acknowledged reads.
-    case dict:find(Key, VnodeState) of
-        {ok, Value} ->
-            debug("read_object: value read was written, OK", []),
-            true;
-        _ ->
-            case Value of
-                not_found ->
-                    debug("read_object: object wasn't written yet, not_found OK", []),
-                    true;
-                _ ->
-                    debug("read_object: consistency violation, object was not written but was read", []),
-                    false
-            end
-    end;
 postcondition(_State, {call, ?MODULE, add_message_filter, [_SourceNode, _DestinationNode]}, ok) ->
     debug("postcondition add_message_filter: succeeded", []),
     %% Added message filter.
@@ -433,6 +416,23 @@ vnode_functions() ->
     lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, vnode_commands()).
 
 %% Postconditions for vnode commands.
+vnode_postcondition(#state{vnode_state=VnodeState}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
+    debug("read_object: returned key ~p value ~p", [Key, Value]),
+    %% Only pass acknowledged reads.
+    case dict:find(Key, VnodeState) of
+        {ok, Value} ->
+            debug("read_object: value read was written, OK", []),
+            true;
+        _ ->
+            case Value of
+                not_found ->
+                    debug("read_object: object wasn't written yet, not_found OK", []),
+                    true;
+                _ ->
+                    debug("read_object: consistency violation, object was not written but was read", []),
+                    false
+            end
+    end;
 vnode_postcondition(_VnodeState, {call, ?MODULE, read_object, [_Node, _Key]}, {error, _}) -> 
     %% Fail timed out reads.
     false;
