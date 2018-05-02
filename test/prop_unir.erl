@@ -392,8 +392,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     [
      {1, {call, ?MODULE, join_cluster, [node_name(), JoinedNodes]}},
      {1, {call, ?MODULE, leave_cluster, [node_name(), JoinedNodes]}},
-     {1, {call, ?MODULE, add_message_filter, [node_name(), node_name()]}},
-     {1, {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}}
+     {5, {call, ?MODULE, add_message_filter, [node_name(), node_name()]}},
+     {5, {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}}
     ].
 
 %%%===================================================================
@@ -403,8 +403,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 %% What vnode-specific operations should be called.
 vnode_commands() ->
     [
-     {10, {call, ?MODULE, read_object, [node_name(), key()]}},
-     {2, {call, ?MODULE, write_object, [node_name(), key(), value()]}}
+     {20, {call, ?MODULE, read_object, [node_name(), key()]}},
+     {10, {call, ?MODULE, write_object, [node_name(), key(), value()]}}
     ].
 
 %% What should the initial vnode state be.
