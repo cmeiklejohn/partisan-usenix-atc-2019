@@ -295,7 +295,15 @@ read_object(Node, Key) ->
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
 add_message_filter(SourceNode, DestinationNode) ->
-    debug("add_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+    MessageFilterFun = fun({N, _}) ->
+        case N of
+            DestinationNode ->
+                false;
+            _ ->
+                true
+        end
+    end,
+    debug("add_message_filter: source_node ~p destination_node ~p", [SourceNode, MessageFilterFun]),
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [DestinationNode, DestinationNode]).
 
 remove_message_filter(SourceNode, DestinationNode) ->
