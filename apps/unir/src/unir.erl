@@ -89,10 +89,13 @@ mk_reqid() ->
     erlang:phash2(erlang:timestamp()).
 
 %% @doc Wait for a response.
-wait_for_reqid(ReqID, _Timeout) ->
+wait_for_reqid(ReqID, Timeout) ->
     receive
         {ReqID, ok} ->
             ok;
         {ReqID, ok, Val} ->
             {ok, Val}
+    after
+        Timeout ->
+            {error, timeout}
     end.
