@@ -147,7 +147,6 @@ precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mo
             %% debug("precondition fired for vnode function: ~p", [Fun]),
             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
             VnodePrecondition = vnode_precondition(VnodeState, Call),
-            debug("precondition fired for vnode function: ~p", [Fun]),
             ClusterCondition andalso VnodePrecondition;
         false ->
             debug("general precondition fired for mod ~p and fun ~p and args ~p", [Mod, Fun, Args]),
