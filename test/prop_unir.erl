@@ -303,8 +303,8 @@ add_message_filter(SourceNode, DestinationNode) ->
                 true
         end
     end,
-    debug("add_message_filter: source_node ~p destination_node ~p", [SourceNode, MessageFilterFun]),
-    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [DestinationNode, DestinationNode]).
+    debug("add_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [DestinationNode, MessageFilterFun]).
 
 remove_message_filter(SourceNode, DestinationNode) ->
     debug("remove_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
