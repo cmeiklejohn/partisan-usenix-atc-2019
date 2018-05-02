@@ -416,7 +416,7 @@ vnode_functions() ->
     lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, vnode_commands()).
 
 %% Postconditions for vnode commands.
-vnode_postcondition(#state{vnode_state=VnodeState}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
+vnode_postcondition(VnodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
     debug("read_object: returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
     case dict:find(Key, VnodeState) of
