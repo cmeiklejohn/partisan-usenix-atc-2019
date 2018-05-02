@@ -18,7 +18,7 @@ release: compile
 	[ -f $(RELPATH)/../unir_config/advanced.config ] || cp $(RELPATH)/etc/advanced.config  $(RELPATH)/../unir_config/advanced.config
 
 sequential-test: release
-    ./rebar3 proper -m prop_unir -p prop_sequential
+	$(REBAR) proper -m prop_unir -p prop_sequential
 
 kill:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
