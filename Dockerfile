@@ -6,11 +6,10 @@ RUN cd /tmp && \
     apt-get update && \
     apt-get -y install wget build-essential make gcc ruby-dev git expect gnuplot tmux
 
-RUN cd /opt && \
+CMD cd /opt && \
     git clone https://github.com/lasp-lang/unir.git && \
     cd unir && \
     make && \
-    make release
-
-CMD cd /opt/unir && \
+    make release && \
+    cd /opt/unir && \
     ./rebar3 proper -m prop_unir -p prop_sequential
