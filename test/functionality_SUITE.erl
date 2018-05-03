@@ -87,6 +87,8 @@ init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_vnode_partitioning, Config) ->
     [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
+init_per_group(partisan_without_fast_forward, Config) ->
+    [{disable_fast_forward, true}] ++ init_per_group(partisan, Config);
 
 init_per_group(_, Config) ->
     Config.
@@ -105,6 +107,7 @@ groups() ->
       [membership_test, 
        metadata_test, 
        get_put_test,
+       get_put_with_partition_test,
        vnode_test]},
 
      {failures, [],
@@ -148,6 +151,9 @@ groups() ->
       [{group, basic}]},
 
      {partisan_with_vnode_partitioning, [],
+      [{group, basic}]},
+
+     {partisan_without_fast_forward, [],
       [{group, basic}]}
     ].
 
@@ -253,6 +259,59 @@ metadata_test(Config) ->
 
     %% Verify that we can read that value at all nodes.
     ?assertEqual(ok, ?SUPPORT:wait_until_metadata_read(SortedNodes)),
+
+    ?SUPPORT:stop(Nodes),
+
+    ok.
+
+get_put_with_partition_test(Config) ->
+    Nodes = ?SUPPORT:start(get_put_with_partition_test,
+                           Config,
+                           [{partisan_peer_service_manager,
+                               partisan_default_peer_service_manager}]),
+
+    SortedNodes = lists:usort([Node || {_Name, Node} <- Nodes]),
+
+    Key = key,
+    Value = <<"binary">>,
+
+    %% Get first node.
+    Node = hd(SortedNodes),
+
+    %% Partition node from all other nodes.
+    PartitionFun = fun(N) ->
+        ct:pal("Adding message filter for node ~p", [N]),
+
+        FilterFun = fun({MessageNode, MessageBody}) ->
+            ct:pal("Filter function invoked for message ~p ~p", [MessageNode, MessageBody]),
+            lager:info("Filter function invoked for message ~p ~p", [MessageNode, MessageBody]),
+
+            case MessageNode of
+                N ->
+                    false;
+                _ ->
+                    true
+            end
+        end,
+        ok = rpc:call(Node, partisan_default_peer_service_manager, add_message_filter, [N, FilterFun])
+    end,
+    lists:foreach(PartitionFun, SortedNodes),
+
+    %% Make get request.
+    case rpc:call(Node, ?APP, ?GET_REQUEST, [Key]) of
+        {ok, _} ->
+            ct:fail({error, successful});
+        {error, timeout} ->
+            ok
+    end,
+
+    %% Make put request.
+    case rpc:call(Node, ?APP, ?PUT_REQUEST, [Key, Value]) of
+        {ok, _} ->
+            ct:fail({error, successful});
+        {error, timeout} ->
+            ok
+    end,
 
     ?SUPPORT:stop(Nodes),
 
