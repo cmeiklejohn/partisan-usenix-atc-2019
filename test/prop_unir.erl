@@ -13,7 +13,7 @@
 -define(SUPPORT, support).
 
 -define(NUM_NODES, 4).
--define(COMMAND_MULTIPLE, 5).
+-define(COMMAND_MULTIPLE, 10).
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
