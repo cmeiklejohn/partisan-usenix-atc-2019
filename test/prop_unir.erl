@@ -441,13 +441,15 @@ vnode_postcondition(VnodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok,
                     false
             end
     end;
-vnode_postcondition(_VnodeState, {call, ?MODULE, read_object, [_Node, _Key]}, {error, _}) -> 
+vnode_postcondition(_VnodeState, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
+    debug("read_object ~p ~p timeout", [Node, Key]),
     %% Fail timed out reads.
     false;
 vnode_postcondition(_VnodeState, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
     %% Only pass acknowledged writes.
     true;
-vnode_postcondition(_VnodeState, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {error, _}) -> 
+vnode_postcondition(_VnodeState, {call, ?MODULE, write_object, [Node, Key, Value]}, {error, timeout}) -> 
+    debug("write_object ~p ~p timeout", [Node, Key, Value]),
     %% Consider timeouts as failures for now.
     false.
 
