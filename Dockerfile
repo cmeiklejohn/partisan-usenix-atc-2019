@@ -1,4 +1,4 @@
-FROM lasplang/erlang:19.3
+FROM erlang:20
 
 MAINTAINER Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>
 
