@@ -95,16 +95,17 @@ start(_Case, Config, Options) ->
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
-                            % ct:pal("Starting node: ~p", [Name]),
+                            NameToStart = name_to_start(Name),
+                            ct:pal("Starting node: ~p", [NameToStart]),
 
                             NodeConfig = [{monitor_master, true},
                                           {erl_flags, "-smp"}, %% smp for the eleveldb god
                                           {startup_functions,
                                            [{code, set_path, [codepath()]}]}],
 
-                            case ct_slave:start(Name, NodeConfig) of
+                            case ct_slave:start(NameToStart, NodeConfig) of
                                 {ok, Node} ->
-                                    % ct:pal("Node started: ~p", [Node]),
+                                    ct:pal("Node started: ~p", [Node]),
                                     {Name, Node};
                                 Error ->
                                     ct:fail(Error)
@@ -795,3 +796,17 @@ schema_dir(Config) ->
     %%  "../../../../_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/",
     %% "/mnt/c/Users/chris/GitHub/unir/_build/default/rel/" ++ atom_to_list(?APP) ++ "/share/schema/".
     root_dir(Config) ++ "_build/default/rel/unir/share/schema/".
+
+-ifdef('20.0').
+
+%% @private
+name_to_start(Name) ->
+    atom_to_list(Name) ++ "@" ++ Hostname.
+
+-else.
+
+%% @private
+name_to_start(Name) ->
+    Name.
+
+-endif.
