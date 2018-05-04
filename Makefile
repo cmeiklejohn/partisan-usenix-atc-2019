@@ -7,9 +7,23 @@ SHELL = /bin/bash
 CONCURRENCY 	 ?= 4
 LATENCY 		 ?= 0
 SIZE 			 ?= 1024
+PROJECT_ID 		 ?= partisan-203021
 
 compile:
 	$(REBAR) compile
+
+gcloud-build:
+	docker build -t gcr.io/$(PROJECT_ID)/unir:v1 .
+	gcloud docker -- push gcr.io/$(PROJECT_ID)/unir:v1
+
+gcloud-deploy:
+	gcloud container clusters delete unir; exit 0
+	gcloud container clusters create unir
+	gcloud container clusters get-credentials unir
+	kubectl create -f unir.yaml
+
+gcloud-delete:
+	gcloud container clusters delete unir
 
 release: compile
 	$(REBAR) release
