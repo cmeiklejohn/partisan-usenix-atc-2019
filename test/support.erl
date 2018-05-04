@@ -801,12 +801,15 @@ schema_dir(Config) ->
 
 %% @private
 name_to_start(Name) ->
-    atom_to_list(Name) ++ "@" ++ Hostname.
+    NodeName = atom_to_list(Name) ++ "@" ++ Hostname,
+    ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
+    NodeName.
 
 -else.
 
 %% @private
 name_to_start(Name) ->
+    ct:pal("Using ~p as name, since running < 20.0", [Name]),
     Name.
 
 -endif.
