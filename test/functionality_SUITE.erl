@@ -107,7 +107,6 @@ groups() ->
       [membership_test, 
        metadata_test, 
        get_put_test,
-       get_put_with_partition_test,
        vnode_test]},
 
      {failures, [],
@@ -154,7 +153,7 @@ groups() ->
       [{group, basic}]},
 
      {partisan_without_fast_forward, [],
-      [{group, basic}]}
+      [get_put_with_partition_test]}
     ].
 
 %% ===================================================================
