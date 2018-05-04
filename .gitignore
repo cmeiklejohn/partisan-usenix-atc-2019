@@ -8,3 +8,4 @@ data/
 _checkouts*
 results.csv
 .rebar3/
+rebar3.crashdump
