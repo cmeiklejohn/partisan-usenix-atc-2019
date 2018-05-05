@@ -1,4 +1,4 @@
-FROM erlang:20
+FROM erlang:20.3
 
 MAINTAINER Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>
 
