@@ -48,7 +48,7 @@ stop(Nodes) ->
     StopFun = fun({Name, _Node}) ->
         % ct:pal("Stopping node: ~p", [Name]),
 
-        case ct_slave:stop(Name) of
+        case ct_slave:stop(name_to_start(Name)) of
             {ok, _} ->
                 ok;
             {error, stop_timeout, _} ->
@@ -73,8 +73,7 @@ start(_Case, Config, Options) ->
     % ct:pal("Launching Erlang distribution..."),
 
     os:cmd(os:find_executable("epmd") ++ " -daemon"),
-    Hostname = "127.0.0.1",
-    case net_kernel:start([list_to_atom("runner@" ++ Hostname), longnames]) of
+    case net_kernel:start([list_to_atom("runner@" ++ hostname()), longnames]) of
         {ok, _} ->
             ok;
         {error, {already_started, _}} ->
@@ -95,7 +94,7 @@ start(_Case, Config, Options) ->
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
-                            NameToStart = name_to_start(Name, Hostname),
+                            NameToStart = name_to_start(Name),
                             ct:pal("Starting node: ~p", [NameToStart]),
 
                             NodeConfig = [{monitor_master, true},
@@ -780,7 +779,7 @@ root_path(Config) ->
             WorkingDir = os:cmd("pwd"),
             string:substr(WorkingDir, 1, length(WorkingDir) - 1) ++ "/";
         DataDir ->
-            DataDir ++ "../../../../../"
+            DataDir ++ "../../../../../../"
     end.
 
 %% @private
@@ -800,16 +799,20 @@ schema_dir(Config) ->
 -ifdef('20.0').
 
 %% @private
-name_to_start(Name, Hostname) ->
-    NodeName = atom_to_list(Name) ++ "@" ++ Hostname,
+name_to_start(Name) ->
+    NodeName = atom_to_list(Name) ++ "@" ++ hostname(),
     ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
     list_to_atom(NodeName).
 
 -else.
 
 %% @private
-name_to_start(Name, Hostname) ->
+name_to_start(Name) ->
     ct:pal("Using ~p as name, since running < 20.0", [Name]),
     Name.
 
 -endif.
+
+%% @private
+hostname() ->
+    "127.0.0.1".
