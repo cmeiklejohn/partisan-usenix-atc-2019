@@ -803,7 +803,7 @@ schema_dir(Config) ->
 name_to_start(Name, Hostname) ->
     NodeName = atom_to_list(Name) ++ "@" ++ Hostname,
     ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
-    NodeName.
+    list_to_atom(NodeName).
 
 -else.
 
