@@ -95,7 +95,7 @@ start(_Case, Config, Options) ->
 
     %% Start all nodes.
     InitializerFun = fun(Name) ->
-                            NameToStart = name_to_start(Name),
+                            NameToStart = name_to_start(Name, Hostname),
                             ct:pal("Starting node: ~p", [NameToStart]),
 
                             NodeConfig = [{monitor_master, true},
@@ -800,7 +800,7 @@ schema_dir(Config) ->
 -ifdef('20.0').
 
 %% @private
-name_to_start(Name) ->
+name_to_start(Name, Hostname) ->
     NodeName = atom_to_list(Name) ++ "@" ++ Hostname,
     ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
     NodeName.
@@ -808,7 +808,7 @@ name_to_start(Name) ->
 -else.
 
 %% @private
-name_to_start(Name) ->
+name_to_start(Name, Hostname) ->
     ct:pal("Using ~p as name, since running < 20.0", [Name]),
     Name.
 
