@@ -808,8 +808,15 @@ name_to_start(Name) ->
 
 %% @private
 name_to_start(Name) ->
-    ct:pal("Using ~p as name, since running < 20.0", [Name]),
-    Name.
+    case os:getenv("OTP20", false) of
+        false ->
+            ct:pal("Using ~p as name, since running < 20.0", [Name]),
+            Name;
+        "true" ->
+            NodeName = atom_to_list(Name) ++ "@" ++ hostname(),
+            ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
+            list_to_atom(NodeName)
+    end.
 
 -endif.
 

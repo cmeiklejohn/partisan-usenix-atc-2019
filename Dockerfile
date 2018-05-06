@@ -12,4 +12,4 @@ CMD cd /opt && \
     make && \
     make release && \
     cd /opt/unir && \
-    ./rebar3 proper -m prop_unir -p prop_sequential
+    OTP20=true ./rebar3 proper -m prop_unir -p prop_sequential
