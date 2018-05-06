@@ -808,7 +808,9 @@ name_to_start(Name) ->
 
 %% @private
 name_to_start(Name) ->
-    case os:getenv("OTP20", false) of
+    OTP20 = os:getenv("OTP20", false),
+    ct:pal("OTP20 configuration: ~p", [OTP20]),
+    case OTP20 of
         false ->
             ct:pal("Using ~p as name, since running < 20.0", [Name]),
             Name;
