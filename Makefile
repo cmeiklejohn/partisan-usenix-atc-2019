@@ -13,7 +13,7 @@ compile:
 	$(REBAR) compile
 
 gcloud-build:
-	docker build -t gcr.io/$(PROJECT_ID)/unir:v1 .
+	docker build --no-cache -t gcr.io/$(PROJECT_ID)/unir:v1 .
 	gcloud docker -- push gcr.io/$(PROJECT_ID)/unir:v1
 
 gcloud-deploy:
@@ -21,6 +21,9 @@ gcloud-deploy:
 	gcloud container clusters create unir
 	gcloud container clusters get-credentials unir
 	kubectl create -f unir.yaml
+
+gcloud-logs:
+	kubectl get pods | tail -1 | awk '{print $1}' | xargs kubectl logs --follow
 
 gcloud-delete:
 	gcloud container clusters delete unir
