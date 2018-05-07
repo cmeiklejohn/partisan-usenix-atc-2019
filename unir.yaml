@@ -13,6 +13,7 @@ spec:
       - name: unir
         image: gcr.io/partisan-203021/unir:v1
         imagePullPolicy: IfNotPresent
+        restartPolicy: Never
         env:
         - name: MY_POD_NAME
           valueFrom:
