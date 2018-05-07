@@ -17,6 +17,7 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
+-define(PERFORM_ASYNC_PARTITIONS, false).
 
 -export([command/1, 
          initial_state/0, 
@@ -395,11 +396,15 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
             []
     end,
 
-    PartitionCommands = 
-        [
-        {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
-        {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}
-        ],
+    PartitionCommands = case ?PERFORM_ASYNC_PARTITIONS of
+        true ->
+            [
+            {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
+            {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}
+            ];
+        false ->
+            []
+    end,
 
     MemberCommands ++ PartitionCommands.
 
