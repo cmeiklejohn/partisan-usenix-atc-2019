@@ -1,0 +1,49 @@
+#!/bin/bash
+
+cat > /tmp/unir.yaml <<EOF
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: unir
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        tag: unir
+    spec:
+      containers:
+      - name: unir
+        image: gcr.io/partisan-203021/unir:v1
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: GIST_TOKEN
+          value: $GIST_TOKEN
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+---
+apiVersion: extensions/v1beta1
+kind: Service
+apiVersion: v1
+metadata:
+  name: unir
+spec:
+  selector:
+    app: unir
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+EOF
+
+kubectl create -f /tmp/unir.yaml
