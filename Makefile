@@ -20,7 +20,7 @@ gcloud-deploy: gcloud-build
 	yes | gcloud container clusters delete unir; exit 0
 	gcloud container clusters create unir
 	gcloud container clusters get-credentials unir
-	/bin/kube
+	bin/kube
 
 kube-deploy:
 	bin/kube
