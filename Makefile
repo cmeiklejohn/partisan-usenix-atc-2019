@@ -17,13 +17,16 @@ gcloud-build:
 	gcloud docker -- push gcr.io/$(PROJECT_ID)/unir:v1
 
 gcloud-deploy: gcloud-build
-	gcloud container clusters delete unir; exit 0
+	yes | gcloud container clusters delete unir; exit 0
 	gcloud container clusters create unir
 	gcloud container clusters get-credentials unir
-	kubectl create -f unir.yaml
+	/bin/kube
+
+kube-deploy:
+	bin/kube
 
 gcloud-delete:
-	gcloud container clusters delete unir
+	yes | gcloud container clusters delete unir; exit 0
 
 release: compile
 	$(REBAR) release
