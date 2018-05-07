@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
       - name: unir
-        image: cmeiklejohn/unir
+        image: gcr.io/partisan-203021/unir:v1
         imagePullPolicy: IfNotPresent
         env:
         - name: MY_POD_NAME
