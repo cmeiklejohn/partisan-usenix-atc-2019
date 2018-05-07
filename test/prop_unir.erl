@@ -396,7 +396,7 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
             []
     end,
 
-    PartitionCommands = case ?PERFORM_ASYNC_PARTITIONS of
+    AsyncPartitionCommands = case ?PERFORM_ASYNC_PARTITIONS of
         true ->
             [
             {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
@@ -406,7 +406,7 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
             []
     end,
 
-    MemberCommands ++ PartitionCommands.
+    MemberCommands ++ AsyncPartitionCommands.
 
 %%%===================================================================
 %%% Vnode Functions
@@ -433,9 +433,10 @@ vnode_postcondition(VnodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok,
     debug("read_object: returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
     case dict:find(Key, VnodeState) of
-        {ok, Value} ->
-            debug("read_object: value read was written, OK", []),
-            true;
+        {ok, KeyValues} ->
+            ItWasWritten = lists:member(Value, KeyValues),
+            debug("read_object: value read in write history: ~p", [ItWasWritten]),
+            ItWasWritten;
         _ ->
             case Value of
                 not_found ->
@@ -465,7 +466,11 @@ vnode_precondition(_VnodeState, {call, _Mod, write_object, [_Node, _Key, _Value]
     true.
 
 %% Next state.
+
+%% Reads don't modify state.
 vnode_next_state(VnodeState, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
     VnodeState;
-vnode_next_state(VnodeState0, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
-    dict:store(Key, Value, VnodeState0).
+
+%% All we know is that the write was acknowledged at *some* of the nodes.
+vnode_next_state(VnodeState, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
+    dict:append_list(Key, [Value], VnodeState).
