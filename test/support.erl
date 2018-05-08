@@ -149,7 +149,7 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, load, [riak_core]),
                             ok = rpc:call(Node, application, set_env, [lager, log_root, NodeDir]),
 
-                            ct:print("Node ~p PrivDir: ~p NodeDir: ~p", [Node, PrivDir, NodeDir]),
+                            lager:info("Node ~p PrivDir: ~p NodeDir: ~p", [Node, PrivDir, NodeDir]),
 
                             PlatformDir = NodeDir ++ "/data/",
                             RingDir = PlatformDir ++ "/ring/",
@@ -341,7 +341,7 @@ join_cluster(Nodes) ->
             %% no other nodes, nothing to join/plan/commit
             ok;
         _ ->
-            case length(Nodes) > 2 of
+            case length(Nodes) > 10 of
                 true ->
                     %% ok do a staged join and then commit it, this eliminates the
                     %% large amount of redundant handoff done in a sequential join
@@ -359,11 +359,17 @@ join_cluster(Nodes) ->
             end
     end,
 
+    lager:info("Waiting for nodes to be ready..."),
     ?assertEqual(ok, wait_until_nodes_ready(Nodes)),
 
     %% Ensure each node owns a portion of the ring
+    lager:info("Waiting for ownership agreement..."),
     ?assertEqual(ok, wait_until_nodes_agree_about_ownership(Nodes)),
+
+    lager:info("Waiting for handoff..."),
     ?assertEqual(ok, wait_until_no_pending_changes(Nodes)),
+
+    lager:info("Waiting for ring convergence..."),
     ?assertEqual(ok, wait_until_ring_converged(Nodes)),
 
     ok.
@@ -385,7 +391,7 @@ owners_according_to(Node) ->
 join(Node, PNode) ->
     timer:sleep(5000),
     R = rpc:call(Node, riak_core, join, [PNode]),
-    lager:info("[join] ~p to (~p): ~p", [Node, PNode, R]),
+    lager:info("Issuing normal join from ~p to ~p: ~p", [Node, PNode, R]),
     ?assertEqual(ok, R),
     ok.
 
@@ -393,7 +399,7 @@ join(Node, PNode) ->
 staged_join(Node, PNode) ->
     timer:sleep(5000),
     R = rpc:call(Node, riak_core, staged_join, [PNode]),
-    lager:info("[join] ~p to (~p): ~p", [Node, PNode, R]),
+    lager:info("Issuing staged join from ~p to ~p: ~p", [Node, PNode, R]),
     ?assertEqual(ok, R),
     ok.
 
@@ -486,13 +492,17 @@ wait_until(Fun) when is_function(Fun) ->
 wait_until_nodes_ready(Nodes) ->
     % lager:info("Wait until nodes are ready : ~p", [Nodes]),
     [?assertEqual(ok, wait_until(Node, fun is_ready/1)) || Node <- Nodes],
+    lager:info("All nodes ready!"),
     ok.
 
 %% @private
 is_ready(Node) ->
+    lager:info("Waiting for node ~p to be ready...", [Node]),
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
-            case lists:member(Node, riak_core_ring:ready_members(Ring)) of
+            ReadyMembers = riak_core_ring:ready_members(Ring),
+            lager:info("-> Ready members: ~p", [ReadyMembers]),
+            case lists:member(Node, ReadyMembers) of
                 true ->
                     true;
                 false ->
@@ -809,7 +819,7 @@ schema_dir(Config) ->
 %% @private
 name_to_start(Name) ->
     NodeName = atom_to_list(Name) ++ "@" ++ hostname(),
-    ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
+    lager:info("Using ~p as name, since running >= 20.0", [NodeName]),
     list_to_atom(NodeName).
 
 -else.
@@ -820,11 +830,11 @@ name_to_start(Name) ->
     ct:pal("OTP20 configuration: ~p", [OTP20]),
     case OTP20 of
         false ->
-            ct:pal("Using ~p as name, since running < 20.0", [Name]),
+            lager:info("Using ~p as name, since running < 20.0", [Name]),
             Name;
         "true" ->
             NodeName = atom_to_list(Name) ++ "@" ++ hostname(),
-            ct:pal("Using ~p as name, since running >= 20.0", [NodeName]),
+            lager:info("Using ~p as name, since running >= 20.0", [NodeName]),
             list_to_atom(NodeName)
     end.
 
