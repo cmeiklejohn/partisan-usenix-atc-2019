@@ -169,7 +169,7 @@ large_scale_test(Config) ->
                                    Config,
                                    [{partisan_peer_service_manager,
                                        partisan_default_peer_service_manager},
-                                   {num_nodes, 30},
+                                   {num_nodes, 10},
                                    {cluster_nodes, false}]),
 
             ?SUPPORT:scale(Nodes, Config)
@@ -182,7 +182,7 @@ scale_test(Config) ->
                            Config,
                            [{partisan_peer_service_manager,
                                partisan_default_peer_service_manager},
-                           {num_nodes, 10},
+                           {num_nodes, 5},
                            {cluster_nodes, false}]),
 
     ?SUPPORT:scale(Nodes, Config),
