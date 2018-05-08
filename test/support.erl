@@ -469,7 +469,7 @@ maybe_wait_for_changes(Node) ->
 %% @private
 wait_until_no_pending_changes(Nodes) ->
     F = fun() ->
-                lager:info("Wait until no pending changes on nodes ~p", [Nodes]),
+                lager:info("Wait until no pending changes on all nodes...", []),
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
                 Changes = [ riak_core_ring:pending_changes(Ring) =:= [] || {ok, Ring} <- Rings ],
