@@ -12,7 +12,7 @@
 
 -define(SUPPORT, support).
 
--define(NUM_NODES, 4).
+-define(NUM_NODES, 3).
 -define(COMMAND_MULTIPLE, 10).
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
@@ -380,7 +380,7 @@ enough_nodes_connected_to_issue_remove(Nodes) ->
     length(Nodes) > 3.
 
 debug(Line, Args) ->
-    ct:pal(Line, Args).
+    lager:info(Line, Args).
 
 is_joined(Node, Cluster) ->
     lists:member(Node, Cluster).
