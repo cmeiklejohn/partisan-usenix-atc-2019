@@ -22,6 +22,10 @@ gcloud-deploy: gcloud-build
 	gcloud container clusters get-credentials unir
 	bin/kube
 
+gcloud-redeploy: gcloud-build
+	kubectl delete -f /tmp/unir.yaml
+	bin/kube
+
 kube-deploy:
 	bin/kube
 
@@ -45,6 +49,12 @@ console:
 
 clear-logs:
 	rm -rf _build/test/logs
+
+proper-logs:
+	find . -name console.log | grep `ls -d ./undefined* | tail -1` | xargs cat
+
+tail-proper-logs:
+	find . -name console.log | grep `ls -d ./undefined* | tail -1` | xargs tail -F
 
 logs:
 	find . -name console.log | grep `ls -d ./_build/test/logs/ct_run* | tail -1` | xargs cat
