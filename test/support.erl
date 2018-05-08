@@ -149,7 +149,7 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, load, [riak_core]),
                             ok = rpc:call(Node, application, set_env, [lager, log_root, NodeDir]),
 
-                            % ct:print("Node dir: ~p", [NodeDir]),
+                            ct:print("Node ~p dir: ~p", [Node, NodeDir]),
 
                             PlatformDir = NodeDir ++ "/data/",
                             RingDir = PlatformDir ++ "/ring/",
