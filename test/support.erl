@@ -410,7 +410,7 @@ plan_and_commit(Node) ->
     % lager:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
-            ct:pal("plan: ring not ready"),
+            lager:info("Plan: ring not ready"),
             timer:sleep(5000),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
@@ -439,7 +439,7 @@ do_commit(Node) ->
             do_commit(Node);
         {error, nothing_planned} ->
             %% Keep waiting...
-            ct:pal("Nothing planned!"),
+            lager:info("Nothing planned!"),
             plan_and_commit(Node);
         ok ->
             ok
@@ -500,7 +500,7 @@ is_ready(Node) ->
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
             ReadyMembers = riak_core_ring:ready_members(Ring),
-            %% lager:info("-> Ready members: ~p", [ReadyMembers]),
+            lager:info("-> Node ~p says ready members: ~p", [Node, ReadyMembers]),
             case lists:member(Node, ReadyMembers) of
                 true ->
                     true;
