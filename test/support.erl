@@ -447,7 +447,7 @@ try_nodes_ready(Nodes, N, SleepMs) ->
           Nodes ->
               ok;
           ReadyNodes ->
-              lager:info("Nodes not ready.  ReadyNodes: ~p, Nodes: ~p", [ReadyNodes, Nodes]),
+              ct:pal("Nodes not ready.  ReadyNodes: ~p, Nodes: ~p", [ReadyNodes, Nodes]),
               timer:sleep(SleepMs),
               try_nodes_ready(Nodes, N-1, SleepMs)
       end.
