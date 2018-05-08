@@ -48,12 +48,12 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, vnode_state, async_message_filters, sync_message_filters}).
+-record(state, {joined_nodes, nodes, node_state, async_message_filters, sync_message_filters}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
     %% Initialize empty dictionary for process state.
-    VnodeState = vnode_initial_state(),
+    NodeState = node_initial_state(),
 
     %% Get the list of nodes.
     Nodes = names(),
@@ -75,12 +75,12 @@ initial_state() ->
 
     #state{joined_nodes=JoinedNodes, 
            nodes=Nodes, 
-           vnode_state=VnodeState, 
+           node_state=NodeState, 
            async_message_filters=AsyncMessageFilters,
            sync_message_filters=SyncMessageFilters}.
 
 command(State) -> 
-    ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
+    ?LET(Commands, cluster_commands(State) ++ node_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
@@ -177,13 +177,13 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
             %% debug("precondition leave_cluster: no nodes left to remove.", []),
             false %% Might need to be changed when there's no read/write operations.
     end;
-precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
-    case lists:member(Fun, vnode_functions()) of
+precondition(#state{node_state=NodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
+    case lists:member(Fun, node_functions()) of
         true ->
-            %% debug("precondition fired for vnode function: ~p", [Fun]),
+            %% debug("precondition fired for node function: ~p", [Fun]),
             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
-            VnodePrecondition = vnode_precondition(VnodeState, Call),
-            ClusterCondition andalso VnodePrecondition;
+            NodePrecondition = node_precondition(NodeState, Call),
+            ClusterCondition andalso NodePrecondition;
         false ->
             debug("general precondition fired for mod ~p and fun ~p and args ~p", [Mod, Fun, Args]),
             false
@@ -216,10 +216,10 @@ postcondition(_State, {call, ?MODULE, leave_cluster, [_Node, _JoinedNodes]}, ok)
     debug("postcondition leave_cluster: succeeded", []),
     %% Accept leaves that succeed.
     true;
-postcondition(#state{vnode_state=VnodeState}, {call, _Mod, Fun, _Args}=Call, Res) -> 
-    case lists:member(Fun, vnode_functions()) of
+postcondition(#state{node_state=NodeState}, {call, _Mod, Fun, _Args}=Call, Res) -> 
+    case lists:member(Fun, node_functions()) of
         true ->
-            vnode_postcondition(VnodeState, Call, Res);
+            node_postcondition(NodeState, Call, Res);
         false ->
             debug("general postcondition fired with response ~p", [Res]),
             %% All other commands pass.
@@ -258,11 +258,11 @@ next_state(#state{joined_nodes=JoinedNodes}=State, _Res, {call, ?MODULE, leave_c
             %% no-op for the leave
             State
     end;
-next_state(#state{vnode_state=VnodeState0}=State, Res, {call, _Mod, Fun, _Args}=Call) -> 
-    case lists:member(Fun, vnode_functions()) of
+next_state(#state{node_state=NodeState0}=State, Res, {call, _Mod, Fun, _Args}=Call) -> 
+    case lists:member(Fun, node_functions()) of
         true ->
-            VnodeState = vnode_next_state(VnodeState0, Res, Call),
-            State#state{vnode_state=VnodeState};
+            NodeState = node_next_state(NodeState0, Res, Call),
+            State#state{node_state=NodeState};
         false ->
             debug("general next_state fired", []),
             State
@@ -518,30 +518,30 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     MemberCommands ++ AsyncPartitionCommands ++ SyncPartitionCommands.
 
 %%%===================================================================
-%%% Vnode Functions
+%%% Node Functions
 %%%===================================================================
 
-%% What vnode-specific operations should be called.
-vnode_commands() ->
+%% What node-specific operations should be called.
+node_commands() ->
     [
      {call, ?MODULE, read_object, [node_name(), key()]},
      {call, ?MODULE, write_object, [node_name(), key(), value()]}
     ].
 
-%% What should the initial vnode state be.
-vnode_initial_state() ->
+%% What should the initial node state be.
+node_initial_state() ->
     dict:new().
 
-%% Names of the vnode functions so we kow when we can dispatch to the vnode
+%% Names of the node functions so we kow when we can dispatch to the node
 %% pre- and postconditions.
-vnode_functions() ->
-    lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, vnode_commands()).
+node_functions() ->
+    lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, node_commands()).
 
-%% Postconditions for vnode commands.
-vnode_postcondition(VnodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
+%% Postconditions for node commands.
+node_postcondition(NodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
     debug("read_object: returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
-    case dict:find(Key, VnodeState) of
+    case dict:find(Key, NodeState) of
         {ok, KeyValues} ->
             ItWasWritten = lists:member(Value, KeyValues),
             debug("read_object: value read in write history: ~p", [ItWasWritten]),
@@ -556,30 +556,30 @@ vnode_postcondition(VnodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok,
                     false
             end
     end;
-vnode_postcondition(_VnodeState, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
+node_postcondition(_NodeState, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
     debug("read_object ~p ~p timeout", [Node, Key]),
     %% Fail timed out reads.
     false;
-vnode_postcondition(_VnodeState, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
+node_postcondition(_NodeState, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
     %% Only pass acknowledged writes.
     true;
-vnode_postcondition(_VnodeState, {call, ?MODULE, write_object, [Node, Key, Value]}, {error, timeout}) -> 
+node_postcondition(_NodeState, {call, ?MODULE, write_object, [Node, Key, Value]}, {error, timeout}) -> 
     debug("write_object ~p ~p timeout", [Node, Key, Value]),
     %% Consider timeouts as failures for now.
     false.
 
 %% Precondition.
-vnode_precondition(_VnodeState, {call, _Mod, read_object, [_Node, _Key]}) -> 
+node_precondition(_NodeState, {call, _Mod, read_object, [_Node, _Key]}) -> 
     true;
-vnode_precondition(_VnodeState, {call, _Mod, write_object, [_Node, _Key, _Value]}) -> 
+node_precondition(_NodeState, {call, _Mod, write_object, [_Node, _Key, _Value]}) -> 
     true.
 
 %% Next state.
 
 %% Reads don't modify state.
-vnode_next_state(VnodeState, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
-    VnodeState;
+node_next_state(NodeState, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
+    NodeState;
 
 %% All we know is that the write was acknowledged at *some* of the nodes.
-vnode_next_state(VnodeState, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
-    dict:append_list(Key, [Value], VnodeState).
+node_next_state(NodeState, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
+    dict:append_list(Key, [Value], NodeState).
