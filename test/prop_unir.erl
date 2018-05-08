@@ -305,11 +305,11 @@ induce_async_partition(SourceNode, DestinationNode) ->
         end
     end,
     debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
-    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [DestinationNode, MessageFilterFun]).
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [{async, DestinationNode}, MessageFilterFun]).
 
 resolve_async_partition(SourceNode, DestinationNode) ->
     debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
-    rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [DestinationNode]).
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [{async, DestinationNode}]).
 
 leave_cluster(Name, JoinedNames) ->
     Node = name_to_nodename(Name),
