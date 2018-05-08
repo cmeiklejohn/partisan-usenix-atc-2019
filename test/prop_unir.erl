@@ -296,6 +296,7 @@ read_object(Node, Key) ->
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
 induce_async_partition(SourceNode, DestinationNode) ->
+    debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
     MessageFilterFun = fun({N, _}) ->
         case N of
             DestinationNode ->
@@ -304,12 +305,61 @@ induce_async_partition(SourceNode, DestinationNode) ->
                 true
         end
     end,
-    debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [{async, DestinationNode}, MessageFilterFun]).
 
 resolve_async_partition(SourceNode, DestinationNode) ->
     debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [{async, DestinationNode}]).
+
+induce_sync_partition(SourceNode, DestinationNode) ->
+    debug("induce_sync_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+
+    %% Filter at Source to Destination.
+    SourceMessageFilterFun = fun({N, _}) ->
+        case N of
+            DestinationNode ->
+                false;
+            _ ->
+                true
+        end
+    end,
+    SourceFilter = rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [{sync, DestinationNode}, SourceMessageFilterFun]),
+
+    %% Filter at Destination to Source.
+    DestinationMessageFilterFun = fun({N, _}) ->
+        case N of
+            SourceNode ->
+                false;
+            _ ->
+                true
+        end
+    end,
+    DestinationFilter = rpc:call(name_to_nodename(DestinationNode), ?MANAGER, add_message_filter, [{sync, SourceNode}, DestinationMessageFilterFun]),
+
+    %% Verify both are set.
+    case {SourceFilter, DestinationFilter} of
+        {ok, ok} ->
+            ok;
+        _ ->
+            {error, can_not_create_filter}
+    end.
+
+resolve_sync_partition(SourceNode, DestinationNode) ->
+    debug("resolve_sync_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+
+    %% Filter at Source to Destination.
+    SourceFilter = rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [{sync, DestinationNode}]),
+
+    %% Filter at Destination to Source.
+    DestinationFilter = rpc:call(name_to_nodename(DestinationNode), ?MANAGER, remove_message_filter, [{sync, SourceNode}]),
+
+    %% Verify both are set.
+    case {SourceFilter, DestinationFilter} of
+        {ok, ok} ->
+            ok;
+        _ ->
+            {error, can_not_create_filter}
+    end.
 
 leave_cluster(Name, JoinedNames) ->
     Node = name_to_nodename(Name),
