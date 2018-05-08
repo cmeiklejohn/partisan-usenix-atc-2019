@@ -95,7 +95,7 @@ start(_Case, Config, Options) ->
     %% Start all nodes.
     InitializerFun = fun(Name) ->
                             NameToStart = name_to_start(Name),
-                            ct:pal("Starting node: ~p", [NameToStart]),
+                            lager:info("Starting node: ~p", [NameToStart]),
 
                             NodeConfig = [{monitor_master, true},
                                           {erl_flags, "-smp"}, %% smp for the eleveldb god
@@ -104,7 +104,7 @@ start(_Case, Config, Options) ->
 
                             case ct_slave:start(NameToStart, NodeConfig) of
                                 {ok, Node} ->
-                                    ct:pal("Node started: ~p", [Node]),
+                                    lager:info("Node started: ~p", [Node]),
                                     {Name, Node};
                                 Error ->
                                     ct:fail(Error)
@@ -149,7 +149,7 @@ start(_Case, Config, Options) ->
                             ok = rpc:call(Node, application, load, [riak_core]),
                             ok = rpc:call(Node, application, set_env, [lager, log_root, NodeDir]),
 
-                            lager:info("Node ~p PrivDir: ~p NodeDir: ~p", [Node, PrivDir, NodeDir]),
+                            %% lager:info("Node ~p PrivDir: ~p NodeDir: ~p", [Node, PrivDir, NodeDir]),
 
                             PlatformDir = NodeDir ++ "/data/",
                             RingDir = PlatformDir ++ "/ring/",
@@ -501,7 +501,7 @@ is_ready(Node) ->
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
             ReadyMembers = riak_core_ring:ready_members(Ring),
-            lager:info("-> Ready members: ~p", [ReadyMembers]),
+            %% lager:info("-> Ready members: ~p", [ReadyMembers]),
             case lists:member(Node, ReadyMembers) of
                 true ->
                     true;
@@ -826,17 +826,8 @@ name_to_start(Name) ->
 
 %% @private
 name_to_start(Name) ->
-    OTP20 = os:getenv("OTP20", false),
-    ct:pal("OTP20 configuration: ~p", [OTP20]),
-    case OTP20 of
-        false ->
-            lager:info("Using ~p as name, since running < 20.0", [Name]),
-            Name;
-        "true" ->
-            NodeName = atom_to_list(Name) ++ "@" ++ hostname(),
-            lager:info("Using ~p as name, since running >= 20.0", [NodeName]),
-            list_to_atom(NodeName)
-    end.
+    lager:info("Using ~p as name, since running < 20.0", [Name]),
+    Name.
 
 -endif.
 
