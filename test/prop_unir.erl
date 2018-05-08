@@ -18,6 +18,7 @@
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
 -define(PERFORM_ASYNC_PARTITIONS, true).
+-define(PERFORM_SYNC_PARTITIONS, false).
 
 -export([command/1, 
          initial_state/0, 
@@ -456,7 +457,17 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
             []
     end,
 
-    MemberCommands ++ AsyncPartitionCommands.
+    SyncPartitionCommands = case ?PERFORM_SYNC_PARTITIONS of
+        true ->
+            [
+            {call, ?MODULE, induce_sync_partition, [node_name(), node_name()]},
+            {call, ?MODULE, resolve_sync_partition, [node_name(), node_name()]}
+            ];
+        false ->
+            []
+    end,
+
+    MemberCommands ++ AsyncPartitionCommands ++ SyncPartitionCommands.
 
 %%%===================================================================
 %%% Vnode Functions
