@@ -145,28 +145,28 @@ extended-bench: kill bench
 	@echo "Running Partisan (vnode partitioning) benchmark with configuration $(BENCH_CONFIG)..."
 	BENCH_CONFIG=$(BENCH_CONFIG) $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_vnode_partitioning --case=bench_test
 
-without-partisan-test: kill
+without-partisan-test: kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=disterl
 
-with-partisan-test: kill
+with-partisan-test: kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=partisan
 
-scale-test: clear-logs kill
+scale-test: clear-logs kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=scale
 
-large-scale-test: kill
+large-scale-test: kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=large_scale
 
-partisan-scale-test: clear-logs kill
+partisan-scale-test: clear-logs kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=partisan_scale
 
-partisan-large-scale-test: kill
+partisan-large-scale-test: kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=partisan_large_scale
 
-partisan-with-binary-padding-test: kill
+partisan-with-binary-padding-test: kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=partisan_with_binary_padding
 
-partisan-with-parallelism-test: kill
+partisan-with-parallelism-test: kill release
 	$(REBAR) ct -v --readable=false --suite=functionality_SUITE --group=partisan_with_parallelism
 
 prod-release:

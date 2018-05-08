@@ -61,11 +61,11 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
-    ct:pal("Beginning test case ~p", [Case]),
+    lager:info("Beginning test case ~p", [Case]),
     [{hash, erlang:phash2({Case, Config})}|Config].
 
 end_per_testcase(Case, Config) ->
-    ct:pal("Ending test case ~p", [Case]),
+    lager:info("Ending test case ~p", [Case]),
     Config.
 
 init_per_group(disterl, Config) ->
@@ -163,7 +163,7 @@ groups() ->
 large_scale_test(Config) ->
     case os:getenv("TRAVIS") of
         "true" ->
-            ct:pal("Skipping test; outside of the travis environment.");
+            lager:info("Skipping test; outside of the travis environment.");
         _ ->
             Nodes = ?SUPPORT:start(large_scale_test,
                                    Config,
@@ -279,10 +279,10 @@ get_put_with_partition_test(Config) ->
 
     %% Partition node from all other nodes.
     PartitionFun = fun(N) ->
-        ct:pal("Adding message filter for node ~p", [N]),
+        lager:info("Adding message filter for node ~p", [N]),
 
         FilterFun = fun({MessageNode, MessageBody}) ->
-            ct:pal("Filter function invoked for message ~p ~p", [MessageNode, MessageBody]),
+            lager:info("Filter function invoked for message ~p ~p", [MessageNode, MessageBody]),
             lager:info("Filter function invoked for message ~p ~p", [MessageNode, MessageBody]),
 
             case MessageNode of
@@ -335,7 +335,7 @@ get_put_test(Config) ->
         {ok, _} ->
             ok;
         GetError ->
-            ct:pal("Get failed: ~p", [GetError]),
+            lager:info("Get failed: ~p", [GetError]),
             ct:fail({error, GetError})
     end,
 
@@ -344,7 +344,7 @@ get_put_test(Config) ->
         {ok, _} ->
             ok;
         PutError ->
-            ct:pal("Put failed: ~p", [PutError]),
+            lager:info("Put failed: ~p", [PutError]),
             ct:fail({error, PutError})
     end,
 
@@ -363,12 +363,12 @@ four_node_membership_test(Config) ->
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
-    ct:pal("Waiting for partisan membership..."),
+    lager:info("Waiting for partisan membership..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
     %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
+    lager:info("Waiting for partisan connections..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_all_connections(SortedNodes)),
 
     ?SUPPORT:stop(Nodes),
@@ -386,21 +386,21 @@ large_gossip_test(Config) ->
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
-    ct:pal("Waiting for partisan membership..."),
+    lager:info("Waiting for partisan membership..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
     %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
+    lager:info("Waiting for partisan connections..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_all_connections(SortedNodes)),
 
     %% Bloat ring.
-    ct:pal("Attempting to bloat the ring to see performance effect..."),
+    lager:info("Attempting to bloat the ring to see performance effect..."),
     Node1 = hd(SortedNodes),
     ok = rpc:call(Node1, riak_core_ring_manager, bloat_ring, []),
 
     %% Sleep for gossip rounds.
-    ct:pal("Sleeping for 50 seconds..."),
+    lager:info("Sleeping for 50 seconds..."),
     timer:sleep(50000),
 
     ?SUPPORT:stop(Nodes),
@@ -418,12 +418,12 @@ membership_test(Config) ->
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
-    ct:pal("Waiting for partisan membership..."),
+    lager:info("Waiting for partisan membership..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
     %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
+    lager:info("Waiting for partisan connections..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_all_connections(SortedNodes)),
 
     ?SUPPORT:stop(Nodes),
@@ -451,45 +451,45 @@ vnode_test(Config) ->
 
     %% Verify partisan connection is configured with the correct
     %% membership information.
-    ct:pal("Waiting for partisan membership..."),
+    lager:info("Waiting for partisan membership..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_partisan_membership(SortedNodes)),
 
     %% Ensure we have the right number of connections.
     %% Verify appropriate number of connections.
-    ct:pal("Waiting for partisan connections..."),
+    lager:info("Waiting for partisan connections..."),
     ?assertEqual(ok, ?SUPPORT:wait_until_all_connections(SortedNodes)),
 
     %% Get the list of nodes.
-    ct:pal("Nodes is: ~p", [Nodes]),
+    lager:info("Nodes is: ~p", [Nodes]),
     [{_, Node1}, {_, _Node2}, {_, _Node3}] = Nodes,
 
     %% Attempt to access the vnode request API.
     %% This will test command/3 and command/4 behavior.
-    ct:pal("Waiting for response from ping command..."),
+    lager:info("Waiting for response from ping command..."),
     CommandResult = rpc:call(Node1, ?APP, ping, []),
     ?assertEqual(ok, CommandResult),
 
     %% Attempt to access the vnode request API.
     %% This will test sync_command/3 and sync_command/4 behavior.
-    ct:pal("Waiting for response from sync_ping command..."),
+    lager:info("Waiting for response from sync_ping command..."),
     SyncCommandResult = rpc:call(Node1, ?APP, sync_ping, []),
     ?assertMatch({pong, _}, SyncCommandResult),
 
     %% Attempt to access the vnode request API.
     %% This will test sync_spawn_command/3 and sync_spawn_command/4 behavior.
-    ct:pal("Waiting for response from sync_spawn_ping command..."),
+    lager:info("Waiting for response from sync_spawn_ping command..."),
     SyncSpawnCommandResult = rpc:call(Node1, ?APP, sync_spawn_ping, []),
     ?assertMatch({pong, _}, SyncSpawnCommandResult),
 
     %% Test the echo functionality.
-    ct:pal("Waiting for response from echo command..."),
+    lager:info("Waiting for response from echo command..."),
     EchoCommandResult = rpc:call(Node1, ?APP, echo, []),
     ?assertMatch(ok, EchoCommandResult),
 
     %% Attempt to access the vnode request API via FSM.
-    ct:pal("Waiting for response from fsm command..."),
+    lager:info("Waiting for response from fsm command..."),
     FsmResult = rpc:call(Node1, ?APP, fsm_ping, []),
-    ct:pal("FSM result: ~p", [FsmResult]),
+    lager:info("FSM result: ~p", [FsmResult]),
     ?assertMatch(ok, FsmResult),
 
     ?SUPPORT:stop(Nodes),
