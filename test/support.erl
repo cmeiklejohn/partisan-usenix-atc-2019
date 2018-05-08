@@ -447,7 +447,7 @@ try_nodes_ready(Nodes, N, SleepMs) ->
           Nodes ->
               ok;
           ReadyNodes ->
-              ct:pal("Nodes not ready.  ReadyNodes: ~p, Nodes: ~p", [ReadyNodes, Nodes]),
+              ct:pal("Nodes not ready, iterations remaining ~p, sleeping ~p; ReadyNodes: ~p, Nodes: ~p", [N, SleepMs, ReadyNodes, Nodes]),
               timer:sleep(SleepMs),
               try_nodes_ready(Nodes, N-1, SleepMs)
       end.
