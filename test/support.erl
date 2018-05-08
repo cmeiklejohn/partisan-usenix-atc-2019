@@ -403,7 +403,7 @@ plan_and_commit(Node) ->
     % lager:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
-            % ct:pal("plan: ring not ready"),
+            ct:pal("plan: ring not ready"),
             timer:sleep(5000),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
@@ -470,7 +470,7 @@ wait_until_no_pending_changes(Nodes) ->
 
 %% @private
 wait_until(Fun) when is_function(Fun) ->
-    MaxTime = 600000, %% @TODO use config,
+    MaxTime = 60000, %% @TODO use config,
         Delay = 1000, %% @TODO use config,
         Retry = MaxTime div Delay,
     wait_until(Fun, Retry, Delay).
