@@ -460,13 +460,16 @@ maybe_wait_for_changes(Node) ->
 %% @private
 wait_until_no_pending_changes(Nodes) ->
     F = fun() ->
-                lager:info("Wait until no pending changes on ~p", [Nodes]),
+                lager:info("Wait until no pending changes on nodes ~p", [Nodes]),
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
                 Changes = [ riak_core_ring:pending_changes(Ring) =:= [] || {ok, Ring} <- Rings ],
+                lager:info("-> BadNodes: ~p, length(Changes): ~p, length(Nodes): ~p, Changes: ~p", 
+                           [BadNodes, length(Changes), length(Nodes), Changes]),
                 BadNodes =:= [] andalso length(Changes) =:= length(Nodes) andalso lists:all(fun(T) -> T end, Changes)
         end,
-    ?assertEqual(ok, wait_until(F, 60, 1000)),
+    ?assertEqual(ok, wait_until(F, 60, 1000))
+    lager:info("No pending changes remain!", []),
     ok.
 
 %% @private
