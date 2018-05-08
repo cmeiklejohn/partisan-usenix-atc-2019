@@ -15,4 +15,5 @@ CMD echo "${GIST_TOKEN}" > /root/.gist && \
     make | tee output-make.txt && \
     make release | tee output-release.txt && \
     make proper; exit 0 | tee output-proper.txt && \
+    make proper-logs; exit 0 | tee output-logs.txt && \
     gist -d "${HOSTNAME}" output-*.txt _build/test/*-counterexamples.consult
