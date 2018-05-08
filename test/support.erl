@@ -446,7 +446,8 @@ try_nodes_ready(Nodes, N, SleepMs) ->
       case ReadyNodes of
           Nodes ->
               ok;
-          _ ->
+          ReadyNodes ->
+              lager:info("Nodes not ready.  ReadyNodes: ~p, Nodes: ~p", [ReadyNodes, Nodes]),
               timer:sleep(SleepMs),
               try_nodes_ready(Nodes, N-1, SleepMs)
       end.
