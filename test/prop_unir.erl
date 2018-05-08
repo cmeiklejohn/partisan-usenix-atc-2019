@@ -17,7 +17,7 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
--define(PERFORM_ASYNC_PARTITIONS, false).
+-define(PERFORM_ASYNC_PARTITIONS, true).
 
 -export([command/1, 
          initial_state/0, 
