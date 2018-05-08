@@ -14,5 +14,5 @@ CMD echo "${GIST_TOKEN}" > /root/.gist && \
     cd unir && \
     make | tee output-make.txt && \
     make release | tee output-release.txt && \
-    make proper | tee output-proper.txt; exit 0 && \
+    make proper; exit 0 | tee output-proper.txt && \
     gist -d "${HOSTNAME}" output-*.txt _build/test/*-counterexamples.consult
