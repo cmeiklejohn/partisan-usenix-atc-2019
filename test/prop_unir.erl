@@ -48,7 +48,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, vnode_state, message_filters}).
+-record(state, {joined_nodes, nodes, vnode_state, async_message_filters}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -67,19 +67,19 @@ initial_state() ->
     end,
 
     %% Message filters.
-    MessageFilters = dict:new(),
+    AsyncMessageFilters = dict:new(),
 
     %% Debug message.
     debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
 
-    #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState, message_filters=MessageFilters}.
+    #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState, async_message_filters=AsyncMessageFilters}.
 
 command(State) -> 
     ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    case dict:find({SourceNode, DestinationNode}, MessageFilters) of
+precondition(#state{async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+    case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
         error ->
             case SourceNode of
                 DestinationNode ->
@@ -90,8 +90,8 @@ precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_async_p
         _ ->
             false
     end;
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    case dict:find({SourceNode, DestinationNode}, MessageFilters) of
+precondition(#state{async_message_filters=AsyncMessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
+    case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
         error ->
             false;
         _ ->
@@ -186,12 +186,12 @@ postcondition(#state{vnode_state=VnodeState}, {call, _Mod, Fun, _Args}=Call, Res
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = dict:store({SourceNode, DestinationNode}, true, MessageFilters0),
-    State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = dict:erase({SourceNode, DestinationNode}, MessageFilters0),
-    State#state{message_filters=MessageFilters};
+next_state(#state{async_message_filters=AsyncMessageFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+    AsyncMessageFilters = dict:store({SourceNode, DestinationNode}, true, AsyncMessageFilters0),
+    State#state{async_message_filters=AsyncMessageFilters};
+next_state(#state{async_message_filters=AsyncMessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
+    AsyncMessageFilters = dict:erase({SourceNode, DestinationNode}, AsyncMessageFilters0),
+    State#state{async_message_filters=AsyncMessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
         true ->
