@@ -2,7 +2,9 @@
 
 FILE=_build/test/rebar3_proper-counterexamples.consult
 if [ -f $FILE ]; then
-   gist -d "results for ${HOSTNAME}" output-*.txt _build/test/*-counterexamples.consult
+    echo "Gisting output files and consult file..."
+    gist -d "results for ${HOSTNAME}" output-*.txt _build/test/rebar3_proper-counterexamples.consult
 else
-   gist -d "results for ${HOSTNAME}" output-*.txt
+    echo "Gisting output files..."
+    gist -d "results for ${HOSTNAME}" output-*.txt
 fi
