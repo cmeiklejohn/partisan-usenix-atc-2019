@@ -1,0 +1,8 @@
+#!/bin/bash
+
+FILE=_build/test/rebar3_proper-counterexamples.consult
+if [ -f $FILE ]; then
+   gist -d "results for ${HOSTNAME}" output-*.txt _build/test/*-counterexamples.consult
+else
+   gist -d "results for ${HOSTNAME}" output-*.txt
+fi

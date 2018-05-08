@@ -19,5 +19,4 @@ CMD echo "${GIST_TOKEN}" > /root/.gist && \
     ./rebar3 proper -m prop_unir -p prop_sequential -n 2; exit 0 | tee output-proper.txt && \
     # make proper; exit 0 | tee output-proper.txt && \
     make proper-logs; exit 0 | tee output-logs.txt && \
-    touch _build/test/rebar3_proper-counterexamples.consult && \
-    gist -d "results for ${HOSTNAME}" output-*.txt _build/test/*-counterexamples.consult
+    bin/gist-results
