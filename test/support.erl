@@ -465,7 +465,7 @@ wait_until_no_pending_changes(Nodes) ->
                 Changes = [ riak_core_ring:pending_changes(Ring) =:= [] || {ok, Ring} <- Rings ],
                 BadNodes =:= [] andalso length(Changes) =:= length(Nodes) andalso lists:all(fun(T) -> T end, Changes)
         end,
-    ?assertEqual(ok, wait_until(F, 10, 1000)),
+    ?assertEqual(ok, wait_until(F, 60, 1000)),
     ok.
 
 %% @private
