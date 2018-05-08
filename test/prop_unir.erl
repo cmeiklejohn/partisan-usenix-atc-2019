@@ -17,7 +17,7 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
--define(PERFORM_ASYNC_PARTITIONS, false).
+-define(PERFORM_ASYNC_PARTITIONS, true).
 
 -export([command/1, 
          initial_state/0, 
@@ -77,7 +77,7 @@ command(State) ->
     ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, add_message_filter, [SourceNode, DestinationNode]}) -> 
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
     case dict:find({SourceNode, DestinationNode}, MessageFilters) of
         error ->
             case SourceNode of
@@ -89,7 +89,7 @@ precondition(#state{message_filters=MessageFilters}, {call, _Mod, add_message_fi
         _ ->
             false
     end;
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, remove_message_filter, [SourceNode, DestinationNode]}) -> 
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
     case dict:find({SourceNode, DestinationNode}, MessageFilters) of
         error ->
             false;
@@ -157,12 +157,12 @@ precondition(#state{vnode_state=VnodeState, joined_nodes=JoinedNodes}, {call, Mo
 %% Given the state `State' *prior* to the call `{call, Mod, Fun, Args}',
 %% determine whether the result `Res' (coming from the actual system)
 %% makes sense.
-postcondition(_State, {call, ?MODULE, add_message_filter, [_SourceNode, _DestinationNode]}, ok) ->
-    debug("postcondition add_message_filter: succeeded", []),
+postcondition(_State, {call, ?MODULE, induce_async_partition, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition induce_async_partition: succeeded", []),
     %% Added message filter.
     true;
-postcondition(_State, {call, ?MODULE, remove_message_filter, [_SourceNode, _DestinationNode]}, ok) ->
-    debug("postcondition remove_message_filter: succeeded", []),
+postcondition(_State, {call, ?MODULE, resolve_async_partition, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition resolve_async_partition: succeeded", []),
     %% Removed message filter.
     true;
 postcondition(_State, {call, ?MODULE, join_cluster, [_Node, _JoinedNodes]}, ok) ->
@@ -185,10 +185,10 @@ postcondition(#state{vnode_state=VnodeState}, {call, _Mod, Fun, _Args}=Call, Res
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, add_message_filter, [SourceNode, DestinationNode]}) -> 
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
     MessageFilters = dict:store({SourceNode, DestinationNode}, true, MessageFilters0),
     State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, remove_message_filter, [SourceNode, DestinationNode]}) -> 
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
     MessageFilters = dict:erase({SourceNode, DestinationNode}, MessageFilters0),
     State#state{message_filters=MessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
@@ -295,7 +295,7 @@ read_object(Node, Key) ->
     debug("read_object: node ~p key ~p", [Node, Key]),
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
-add_message_filter(SourceNode, DestinationNode) ->
+induce_async_partition(SourceNode, DestinationNode) ->
     MessageFilterFun = fun({N, _}) ->
         case N of
             DestinationNode ->
@@ -304,11 +304,11 @@ add_message_filter(SourceNode, DestinationNode) ->
                 true
         end
     end,
-    debug("add_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+    debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [DestinationNode, MessageFilterFun]).
 
-remove_message_filter(SourceNode, DestinationNode) ->
-    debug("remove_message_filter: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+resolve_async_partition(SourceNode, DestinationNode) ->
+    debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [DestinationNode]).
 
 leave_cluster(Name, JoinedNames) ->
@@ -399,8 +399,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     AsyncPartitionCommands = case ?PERFORM_ASYNC_PARTITIONS of
         true ->
             [
-            {call, ?MODULE, add_message_filter, [node_name(), node_name()]},
-            {call, ?MODULE, remove_message_filter, [node_name(), node_name()]}
+            {call, ?MODULE, induce_async_partition, [node_name(), node_name()]},
+            {call, ?MODULE, resolve_async_partition, [node_name(), node_name()]}
             ];
         false ->
             []
