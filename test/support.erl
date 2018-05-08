@@ -399,6 +399,7 @@ staged_join(Node, PNode) ->
 
 %% @private
 plan_and_commit(Node) ->
+    lager:info("Sleeping 5 seconds for cluster commit."),
     timer:sleep(5000),
     % lager:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
@@ -408,6 +409,7 @@ plan_and_commit(Node) ->
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
         {ok, _Actions, _RingTransitions} ->
+            lager:info("Plan ready, performing commit."),
             % ct:pal("Actions for ring transition: ~p", [Actions]),
             do_commit(Node);
         Other ->
@@ -416,6 +418,7 @@ plan_and_commit(Node) ->
 
 %% @private
 do_commit(Node) ->
+    lager:info("Committing plan."),
     % lager:info("Committing"),
     case rpc:call(Node, riak_core_claimant, commit, []) of
         {error, plan_changed} ->
@@ -430,7 +433,7 @@ do_commit(Node) ->
             do_commit(Node);
         {error, nothing_planned} ->
             %% Keep waiting...
-            % ct:pal("Nothing planned!"),
+            ct:pal("Nothing planned!"),
             plan_and_commit(Node);
         ok ->
             ok
