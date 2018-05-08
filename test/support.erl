@@ -468,7 +468,7 @@ wait_until_no_pending_changes(Nodes) ->
                            [BadNodes, length(Changes), length(Nodes), Changes]),
                 BadNodes =:= [] andalso length(Changes) =:= length(Nodes) andalso lists:all(fun(T) -> T end, Changes)
         end,
-    ?assertEqual(ok, wait_until(F, 60, 1000))
+    ?assertEqual(ok, wait_until(F, 60, 1000)),
     lager:info("No pending changes remain!", []),
     ok.
 
