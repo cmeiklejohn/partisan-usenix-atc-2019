@@ -46,7 +46,7 @@
 %% @private
 stop(Nodes) ->
     StopFun = fun({Name, _Node}) ->
-        % ct:pal("Stopping node: ~p", [Name]),
+        ct:pal("Stopping node: ~p", [Name]),
 
         case ct_slave:stop(name_to_start(Name)) of
             {ok, _} ->
@@ -445,9 +445,10 @@ try_nodes_ready(Nodes, N, SleepMs) ->
 
       case ReadyNodes of
           Nodes ->
+              lager:info("Nodes now ready."),
               ok;
           ReadyNodes ->
-              ct:pal("Nodes not ready, iterations remaining ~p, sleeping ~p; ReadyNodes: ~p, Nodes: ~p", [N, SleepMs, ReadyNodes, Nodes]),
+              lager:info("Nodes not ready, iterations remaining ~p, sleeping ~p; ReadyNodes: ~p, Nodes: ~p", [N, SleepMs, ReadyNodes, Nodes]),
               timer:sleep(SleepMs),
               try_nodes_ready(Nodes, N-1, SleepMs)
       end.
