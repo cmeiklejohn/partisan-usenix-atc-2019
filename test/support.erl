@@ -470,7 +470,7 @@ wait_until_no_pending_changes(Nodes) ->
 
 %% @private
 wait_until(Fun) when is_function(Fun) ->
-    MaxTime = 60000, %% @TODO use config,
+    MaxTime = 10000, %% @TODO use config,
         Delay = 1000, %% @TODO use config,
         Retry = MaxTime div Delay,
     wait_until(Fun, Retry, Delay).
