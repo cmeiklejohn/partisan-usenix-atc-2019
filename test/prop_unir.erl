@@ -17,8 +17,8 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
--define(PERFORM_ASYNC_PARTITIONS, true).
--define(PERFORM_SYNC_PARTITIONS, false).
+-define(PERFORM_ASYNC_PARTITIONS, false).
+-define(PERFORM_SYNC_PARTITIONS, true).
 
 -export([command/1, 
          initial_state/0, 
@@ -48,7 +48,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, vnode_state, async_message_filters}).
+-record(state, {joined_nodes, nodes, vnode_state, async_message_filters, sync_message_filters}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -68,30 +68,64 @@ initial_state() ->
 
     %% Message filters.
     AsyncMessageFilters = dict:new(),
+    SyncMessageFilters = dict:new(),
 
     %% Debug message.
     debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
 
-    #state{joined_nodes=JoinedNodes, nodes=Nodes, vnode_state=VnodeState, async_message_filters=AsyncMessageFilters}.
+    #state{joined_nodes=JoinedNodes, 
+           nodes=Nodes, 
+           vnode_state=VnodeState, 
+           async_message_filters=AsyncMessageFilters,
+           sync_message_filters=SyncMessageFilters}.
 
 command(State) -> 
     ?LET(Commands, cluster_commands(State) ++ vnode_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
-precondition(#state{async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
     case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
         error ->
-            case SourceNode of
-                DestinationNode ->
-                    false;
+            case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
+                error ->
+                    case SourceNode of
+                        DestinationNode ->
+                            false;
+                        _ ->
+                            true
+                    end;
                 _ ->
-                    true
+                    false
             end;
         _ ->
             false
     end;
 precondition(#state{async_message_filters=AsyncMessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
     case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end;
+precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
+    case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
+        error ->
+            case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
+                error ->
+                    case SourceNode of
+                        DestinationNode ->
+                            false;
+                        _ ->
+                            true
+                    end;
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end;
+precondition(#state{sync_message_filters=SyncMessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
+    case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
         error ->
             false;
         _ ->
@@ -166,6 +200,14 @@ postcondition(_State, {call, ?MODULE, resolve_async_partition, [_SourceNode, _De
     debug("postcondition resolve_async_partition: succeeded", []),
     %% Removed message filter.
     true;
+postcondition(_State, {call, ?MODULE, induce_sync_partition, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition induce_sync_partition: succeeded", []),
+    %% Added message filter.
+    true;
+postcondition(_State, {call, ?MODULE, resolve_sync_partition, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition resolve_sync_partition: succeeded", []),
+    %% Removed message filter.
+    true;
 postcondition(_State, {call, ?MODULE, join_cluster, [_Node, _JoinedNodes]}, ok) ->
     debug("postcondition join_cluster: succeeded", []),
     %% Accept joins that succeed.
@@ -192,6 +234,12 @@ next_state(#state{async_message_filters=AsyncMessageFilters0}=State, _Res, {call
 next_state(#state{async_message_filters=AsyncMessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
     AsyncMessageFilters = dict:erase({SourceNode, DestinationNode}, AsyncMessageFilters0),
     State#state{async_message_filters=AsyncMessageFilters};
+next_state(#state{sync_message_filters=SyncMessageFilters0}=State, _Res, {call, ?MODULE, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
+    SyncMessageFilters = dict:store({SourceNode, DestinationNode}, true, SyncMessageFilters0),
+    State#state{sync_message_filters=SyncMessageFilters};
+next_state(#state{sync_message_filters=SyncMessageFilters0}=State, _Res, {call, ?MODULE, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
+    SyncMessageFilters = dict:erase({SourceNode, DestinationNode}, SyncMessageFilters0),
+    State#state{sync_message_filters=SyncMessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
         true ->
