@@ -46,7 +46,7 @@
 %% @private
 stop(Nodes) ->
     StopFun = fun({Name, _Node}) ->
-        ct:pal("Stopping node: ~p", [Name]),
+        lager:info("Stopping node: ~p", [name_to_start(Name)]),
 
         case ct_slave:stop(name_to_start(Name)) of
             {ok, _} ->
@@ -473,8 +473,7 @@ wait_until_no_pending_changes(Nodes) ->
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
                 Changes = [ riak_core_ring:pending_changes(Ring) =:= [] || {ok, Ring} <- Rings ],
-                lager:info("-> BadNodes: ~p, length(Changes): ~p, length(Nodes): ~p, Changes: ~p", 
-                           [BadNodes, length(Changes), length(Nodes), Changes]),
+                %% lager:info("-> BadNodes: ~p, length(Changes): ~p, length(Nodes): ~p, Changes: ~p", [BadNodes, length(Changes), length(Nodes), Changes]),
                 BadNodes =:= [] andalso length(Changes) =:= length(Nodes) andalso lists:all(fun(T) -> T end, Changes)
         end,
     ?assertEqual(ok, wait_until(F, 60, 1000)),
@@ -819,14 +818,14 @@ schema_dir(Config) ->
 %% @private
 name_to_start(Name) ->
     NodeName = atom_to_list(Name) ++ "@" ++ hostname(),
-    lager:info("Using ~p as name, since running >= 20.0", [NodeName]),
+    %% lager:info("Using ~p as name, since running >= 20.0", [NodeName]),
     list_to_atom(NodeName).
 
 -else.
 
 %% @private
 name_to_start(Name) ->
-    lager:info("Using ~p as name, since running < 20.0", [Name]),
+    %% lager:info("Using ~p as name, since running < 20.0", [Name]),
     Name.
 
 -endif.
