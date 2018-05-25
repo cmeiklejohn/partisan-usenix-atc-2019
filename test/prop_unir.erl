@@ -1,3 +1,5 @@
+%% TODO: Sync partition code is wrong because it only checks one direction.
+%%
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2017 Christopher S. Meiklejohn.  All Rights Reserved.
@@ -17,6 +19,7 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
+-define(PERFORM_CLUSTER_PARTITIONS, false).
 -define(PERFORM_ASYNC_PARTITIONS, false).
 -define(PERFORM_SYNC_PARTITIONS, true).
 
@@ -84,53 +87,13 @@ command(State) ->
 
 %% Picks whether a command should be valid under the current state.
 precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
-        error ->
-            case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
-                error ->
-                    case SourceNode of
-                        DestinationNode ->
-                            false;
-                        _ ->
-                            true
-                    end;
-                _ ->
-                    false
-            end;
-        _ ->
-            false
-    end;
+    not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters);
 precondition(#state{async_message_filters=AsyncMessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
-        error ->
-            false;
-        _ ->
-            true
-    end;
+    is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters);
 precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
-    case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
-        error ->
-            case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
-                error ->
-                    case SourceNode of
-                        DestinationNode ->
-                            false;
-                        _ ->
-                            true
-                    end;
-                _ ->
-                    false
-            end;
-        _ ->
-            false
-    end;
+    not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters);
 precondition(#state{sync_message_filters=SyncMessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
-    case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
-        error ->
-            false;
-        _ ->
-            true
-    end;
+    is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters);
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
     %% debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
@@ -477,7 +440,17 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
             []
     end,
 
-    MemberCommands ++ AsyncPartitionCommands ++ SyncPartitionCommands.
+    ClusterPartitionCommands = case ?PERFORM_CLUSTER_PARTITIONS of
+        true ->
+            [
+             {call, ?MODULE, induce_cluster_partition, [some_nodes()]},
+             {call, ?MODULE, resolve_cluster_partition, [some_nodes()]}
+            ];
+        false ->
+            []
+    end,
+
+    MemberCommands ++ AsyncPartitionCommands ++ SyncPartitionCommands ++ ClusterPartitionCommands.
 
 %%%===================================================================
 %%% Node Functions
@@ -546,10 +519,45 @@ node_next_state(NodeState, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) ->
 node_next_state(NodeState, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
     dict:append_list(Key, [Value], NodeState).
 
+%% Determine if a bunch of operations succeeded or failed.
 all_to_ok_or_error(List) ->
-    case lists:all(fun(X) -> X =:= ok, List) of
+    case lists:all(fun(X) -> X =:= ok end, List) of
         true ->
             ok;
         false ->
             {error, some_opertions_failed}
     end.
+
+%% Select a random grouping of nodes.
+some_nodes() ->
+    %% TODO: Fix me.
+    %% ?LET(Names, names(), list(?NUM_NODES / 2, Names)).
+    [].
+
+is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) ->
+    case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end.
+
+is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters) ->
+    Source = case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Destination = case dict:find({DestinationNode, SourceNode}, SyncMessageFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Source orelse Destination.
+
+is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters) ->
+    is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) orelse is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters).
