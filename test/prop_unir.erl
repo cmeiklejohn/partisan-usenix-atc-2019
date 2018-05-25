@@ -362,53 +362,15 @@ resolve_async_partition(SourceNode, DestinationNode) ->
 
 induce_sync_partition(SourceNode, DestinationNode) ->
     debug("induce_sync_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
-
-    %% Filter at Source to Destination.
-    SourceMessageFilterFun = fun({N, _}) ->
-        case N of
-            DestinationNode ->
-                false;
-            _ ->
-                true
-        end
-    end,
-    SourceFilter = rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [{sync, DestinationNode}, SourceMessageFilterFun]),
-
-    %% Filter at Destination to Source.
-    DestinationMessageFilterFun = fun({N, _}) ->
-        case N of
-            SourceNode ->
-                false;
-            _ ->
-                true
-        end
-    end,
-    DestinationFilter = rpc:call(name_to_nodename(DestinationNode), ?MANAGER, add_message_filter, [{sync, SourceNode}, DestinationMessageFilterFun]),
-
-    %% Verify both are set.
-    case {SourceFilter, DestinationFilter} of
-        {ok, ok} ->
-            ok;
-        _ ->
-            {error, can_not_create_filter}
-    end.
+    SourceResult = induce_async_partition(SourceNode, DestinationNode),
+    DestinationResult = induce_async_partition(DestinationNode, SourceNode),
+    all_to_ok_or_error([SourceResult, DestinationResult]).
 
 resolve_sync_partition(SourceNode, DestinationNode) ->
     debug("resolve_sync_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
-
-    %% Filter at Source to Destination.
-    SourceFilter = rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [{sync, DestinationNode}]),
-
-    %% Filter at Destination to Source.
-    DestinationFilter = rpc:call(name_to_nodename(DestinationNode), ?MANAGER, remove_message_filter, [{sync, SourceNode}]),
-
-    %% Verify both are set.
-    case {SourceFilter, DestinationFilter} of
-        {ok, ok} ->
-            ok;
-        _ ->
-            {error, can_not_create_filter}
-    end.
+    SourceResult = resolve_async_partition(SourceNode, DestinationNode),
+    DestinationResult = resolve_async_partition(DestinationNode, SourceNode),
+    all_to_ok_or_error([SourceResult, DestinationResult]).
 
 leave_cluster(Name, JoinedNames) ->
     Node = name_to_nodename(Name),
@@ -583,3 +545,11 @@ node_next_state(NodeState, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) ->
 %% All we know is that the write was acknowledged at *some* of the nodes.
 node_next_state(NodeState, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
     dict:append_list(Key, [Value], NodeState).
+
+all_to_ok_or_error(List) ->
+    case lists:all(fun(X) -> X =:= ok, List) of
+        true ->
+            ok;
+        false ->
+            {error, some_opertions_failed}
+    end.
