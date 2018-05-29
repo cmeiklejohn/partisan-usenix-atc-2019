@@ -56,7 +56,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, node_state, async_message_filters, sync_message_filters}).
+-record(state, {joined_nodes, nodes, node_state, message_filters}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -75,8 +75,7 @@ initial_state() ->
     end,
 
     %% Message filters.
-    AsyncMessageFilters = dict:new(),
-    SyncMessageFilters = dict:new(),
+    MessageFilters = dict:new(),
 
     %% Debug message.
     debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
@@ -84,31 +83,30 @@ initial_state() ->
     #state{joined_nodes=JoinedNodes, 
            nodes=Nodes, 
            node_state=NodeState, 
-           async_message_filters=AsyncMessageFilters,
-           sync_message_filters=SyncMessageFilters}.
+           message_filters=MessageFilters}.
 
 command(State) -> 
     ?LET(Commands, cluster_commands(State) ++ node_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
-precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters);
-precondition(#state{async_message_filters=AsyncMessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters);
-precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
-    not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters);
-precondition(#state{sync_message_filters=SyncMessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
-    is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters);
-precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+    not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
+    is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
+    not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
+    is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
     lists:all(fun(SourceNode) -> 
         lists:all(fun(DestinationNode) ->
-            not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters)
+            not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters)
         end, MinorityNodes)
     end, MajorityNodes);
-precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
     lists:all(fun(SourceNode) -> 
         lists:all(fun(DestinationNode) ->
-            is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters)
+            is_involved_in_partition(SourceNode, DestinationNode, MessageFilters)
         end, MinorityNodes)
     end, MajorityNodes);
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
@@ -208,18 +206,18 @@ postcondition(#state{node_state=NodeState}, {call, _Mod, Fun, _Args}=Call, Res) 
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
-next_state(#state{async_message_filters=AsyncMessageFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    AsyncMessageFilters = dict:store({SourceNode, DestinationNode}, true, AsyncMessageFilters0),
-    State#state{async_message_filters=AsyncMessageFilters};
-next_state(#state{async_message_filters=AsyncMessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    AsyncMessageFilters = dict:erase({SourceNode, DestinationNode}, AsyncMessageFilters0),
-    State#state{async_message_filters=AsyncMessageFilters};
-next_state(#state{sync_message_filters=SyncMessageFilters0}=State, _Res, {call, ?MODULE, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
-    SyncMessageFilters = dict:store({SourceNode, DestinationNode}, true, SyncMessageFilters0),
-    State#state{sync_message_filters=SyncMessageFilters};
-next_state(#state{sync_message_filters=SyncMessageFilters0}=State, _Res, {call, ?MODULE, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
-    SyncMessageFilters = dict:erase({SourceNode, DestinationNode}, SyncMessageFilters0),
-    State#state{sync_message_filters=SyncMessageFilters};
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+    MessageFilters = add_async_partition(SourceNode, DestinationNode, MessageFilters0),
+    State#state{message_filters=MessageFilters};
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
+    MessageFilters = delete_async_partition(SourceNode, DestinationNode, MessageFilters0),
+    State#state{message_filters=MessageFilters};
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
+    MessageFilters = add_sync_partition(SourceNode, DestinationNode, MessageFilters0),
+    State#state{message_filters=MessageFilters};
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
+    MessageFilters = delete_sync_partition(SourceNode, DestinationNode, MessageFilters0),
+    State#state{message_filters=MessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
         true ->
@@ -551,25 +549,16 @@ majority_nodes() ->
         ?LET(Names, names(), 
             ?LET(Sublist, lists:sublist(Names, trunc(MajorityCount)), Sublist))).
 
-%% Is a node involved in an async partition?
-is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) ->
-    case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
-        error ->
-            false;
-        _ ->
-            true
-    end.
-
 %% Is a node involved in an sync partition?
-is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters) ->
-    Source = case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
+is_involved_in_partition(SourceNode, DestinationNode, MessageFilters) ->
+    Source = case dict:find({SourceNode, DestinationNode}, MessageFilters) of
         error ->
             false;
         _ ->
             true
     end,
 
-    Destination = case dict:find({DestinationNode, SourceNode}, SyncMessageFilters) of
+    Destination = case dict:find({DestinationNode, SourceNode}, MessageFilters) of
         error ->
             false;
         _ ->
@@ -578,7 +567,16 @@ is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters) -
 
     Source orelse Destination.
 
-%% Is the node involved in any type of partition.
-is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters) ->
-    is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) orelse 
-        is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters).
+delete_sync_partition(SourceNode, DestinationNode, MessageFilters) ->
+    delete_async_partition(DestinationNode, SourceNode, 
+        delete_async_partition(SourceNode, DestinationNode, MessageFilters)).
+
+delete_async_partition(SourceNode, DestinationNode, MessageFilters) ->
+    dict:erase({SourceNode, DestinationNode}, MessageFilters).
+
+add_sync_partition(SourceNode, DestinationNode, MessageFilters) ->
+    add_async_partition(SourceNode, DestinationNode,
+        add_async_partition(DestinationNode, SourceNode, MessageFilters)).
+
+add_async_partition(SourceNode, DestinationNode, MessageFilters) ->
+    dict:store({SourceNode, DestinationNode}, true, MessageFilters).
