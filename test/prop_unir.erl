@@ -19,6 +19,11 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
+
+% TODO: Need cluster filter next_state.
+% TODO: Need cluster filter postcondition.
+
+%% Only one of the modes below should be selected for proper shriking.
 -define(PERFORM_CLUSTER_PARTITIONS, true).
 -define(PERFORM_ASYNC_PARTITIONS, false).
 -define(PERFORM_SYNC_PARTITIONS, false).
@@ -94,6 +99,18 @@ precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filte
     not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters);
 precondition(#state{sync_message_filters=SyncMessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
     is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters);
+precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+    lists:all(fun(SourceNode) -> 
+        lists:all(fun(DestinationNode) ->
+            not is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters)
+        end, MinorityNodes)
+    end, MajorityNodes);
+precondition(#state{sync_message_filters=SyncMessageFilters, async_message_filters=AsyncMessageFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+    lists:all(fun(SourceNode) -> 
+        lists:all(fun(DestinationNode) ->
+            is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters)
+        end, MinorityNodes)
+    end, MajorityNodes);
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
     %% debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
@@ -443,8 +460,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     ClusterPartitionCommands = case ?PERFORM_CLUSTER_PARTITIONS of
         true ->
             [
-             {call, ?MODULE, induce_cluster_partition, [majority_nodes()]},
-             {call, ?MODULE, resolve_cluster_partition, [majority_nodes()]}
+             {call, ?MODULE, induce_cluster_partition, [majority_nodes(), names()]},
+             {call, ?MODULE, resolve_cluster_partition, [majority_nodes(), names()]}
             ];
         false ->
             []
