@@ -19,9 +19,9 @@
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
--define(PERFORM_CLUSTER_PARTITIONS, false).
+-define(PERFORM_CLUSTER_PARTITIONS, true).
 -define(PERFORM_ASYNC_PARTITIONS, false).
--define(PERFORM_SYNC_PARTITIONS, true).
+-define(PERFORM_SYNC_PARTITIONS, false).
 
 -export([command/1, 
          initial_state/0, 
@@ -443,8 +443,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     ClusterPartitionCommands = case ?PERFORM_CLUSTER_PARTITIONS of
         true ->
             [
-             {call, ?MODULE, induce_cluster_partition, [some_nodes()]},
-             {call, ?MODULE, resolve_cluster_partition, [some_nodes()]}
+             {call, ?MODULE, induce_cluster_partition, [majority_nodes()]},
+             {call, ?MODULE, resolve_cluster_partition, [majority_nodes()]}
             ];
         false ->
             []
@@ -529,11 +529,12 @@ all_to_ok_or_error(List) ->
     end.
 
 %% Select a random grouping of nodes.
-some_nodes() ->
-    %% TODO: Fix me.
-    %% ?LET(Names, names(), list(?NUM_NODES / 2, Names)).
-    [].
+majority_nodes() ->
+    ?LET(MajorityCount, ?NUM_NODES / 2 + 1,
+        ?LET(Names, names(), 
+            ?LET(Sublist, lists:sublist(Names, trunc(MajorityCount)), Sublist))).
 
+%% Is a node involved in an async partition?
 is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) ->
     case dict:find({SourceNode, DestinationNode}, AsyncMessageFilters) of
         error ->
@@ -542,6 +543,7 @@ is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters)
             true
     end.
 
+%% Is a node involved in an sync partition?
 is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters) ->
     Source = case dict:find({SourceNode, DestinationNode}, SyncMessageFilters) of
         error ->
@@ -559,5 +561,7 @@ is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters) -
 
     Source orelse Destination.
 
+%% Is the node involved in any type of partition.
 is_involved_in_partition(SourceNode, DestinationNode, AsyncMessageFilters, SyncMessageFilters) ->
-    is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) orelse is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters).
+    is_involved_in_async_partition(SourceNode, DestinationNode, AsyncMessageFilters) orelse 
+        is_involved_in_sync_partition(SourceNode, DestinationNode, SyncMessageFilters).
