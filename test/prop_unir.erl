@@ -20,9 +20,6 @@
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(PERFORM_LEAVES_AND_JOINS, false).
 
-% TODO: Need cluster filter next_state.
-% TODO: Need cluster filter postcondition.
-
 %% Only one of the modes below should be selected for proper shriking.
 -define(PERFORM_CLUSTER_PARTITIONS, true).
 -define(PERFORM_ASYNC_PARTITIONS, false).
