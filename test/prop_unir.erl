@@ -600,3 +600,27 @@ delete_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters) ->
             delete_sync_partition(SourceNode, DestinationNode, Filters2)
             end, Filters, MinorityNodes)
         end, MessageFilters, MajorityNodes).
+
+induce_cluster_partition(MajorityNodes, MinorityNodes) ->
+    debug("induce_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
+    Results = lists:flatmap(fun(SourceNode) ->
+        lists:flatmap(fun(DestinationNode) ->
+            [
+             induce_async_partition(SourceNode, DestinationNode),
+             induce_async_partition(DestinationNode, SourceNode)
+            ]
+            end, MinorityNodes)
+        end, MajorityNodes),
+    all_to_ok_or_error(Results).
+
+resolve_cluster_partition(MajorityNodes, MinorityNodes) ->
+    debug("resolve_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
+    Results = lists:flatmap(fun(SourceNode) ->
+        lists:flatmap(fun(DestinationNode) ->
+            [
+             resolve_async_partition(SourceNode, DestinationNode),
+             resolve_async_partition(DestinationNode, SourceNode)
+            ]
+            end, MinorityNodes)
+        end, MajorityNodes),
+    all_to_ok_or_error(Results).
