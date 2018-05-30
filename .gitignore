@@ -9,3 +9,4 @@ _checkouts*
 results.csv
 .rebar3/
 rebar3.crashdump
+results-*
