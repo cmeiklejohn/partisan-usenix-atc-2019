@@ -500,7 +500,7 @@ is_ready(Node) ->
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
             ReadyMembers = riak_core_ring:ready_members(Ring),
-            lager:info("-> Node ~p says ready members: ~p", [Node, ReadyMembers]),
+            %% lager:info("-> Node ~p says ready members: ~p", [Node, ReadyMembers]),
             case lists:member(Node, ReadyMembers) of
                 true ->
                     true;

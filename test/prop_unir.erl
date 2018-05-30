@@ -25,6 +25,9 @@
 -define(PERFORM_ASYNC_PARTITIONS, false).
 -define(PERFORM_SYNC_PARTITIONS, false).
 
+%% Other options to exercise pathological cases.
+-define(BIAS_MINORITY, true).
+
 -export([command/1, 
          initial_state/0, 
          next_state/3,
@@ -53,7 +56,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, node_state, message_filters}).
+-record(state, {joined_nodes, nodes, node_state, message_filters, minority_nodes, majority_nodes}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -73,12 +76,16 @@ initial_state() ->
 
     %% Message filters.
     MessageFilters = dict:new(),
+    MinorityNodes = [],
+    MajorityNodes = [],
 
     %% Debug message.
     debug("initial_state: nodes ~p joined_nodes ~p", [Nodes, JoinedNodes]),
 
     #state{joined_nodes=JoinedNodes, 
-           nodes=Nodes, 
+           nodes=Nodes,
+           minority_nodes=MinorityNodes,
+           majority_nodes=MajorityNodes, 
            node_state=NodeState, 
            message_filters=MessageFilters}.
 
@@ -156,13 +163,26 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
             %% debug("precondition leave_cluster: no nodes left to remove.", []),
             false %% Might need to be changed when there's no read/write operations.
     end;
-precondition(#state{node_state=NodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
+precondition(#state{minority_nodes=MinorityNodes, node_state=NodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
     case lists:member(Fun, node_functions()) of
         true ->
-            %% debug("precondition fired for node function: ~p", [Fun]),
-            ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
-            NodePrecondition = node_precondition(NodeState, Call),
-            ClusterCondition andalso NodePrecondition;
+            case ?BIAS_MINORITY andalso length(MinorityNodes) > 0 of
+                true ->
+                    debug("precondition fired for node function: ~p, bias_minority: ~p, node ~p is in minority", [Fun, ?BIAS_MINORITY, Node]),
+                    case lists:member(Node, MinorityNodes) of
+                        true ->
+                            debug("=> bias towards minority, write is going to node ~p in minority", [Node]),
+                            ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
+                            NodePrecondition = node_precondition(NodeState, Call),
+                            ClusterCondition andalso NodePrecondition;
+                        false ->
+                            false
+                    end;
+                false ->
+                    ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
+                    NodePrecondition = node_precondition(NodeState, Call),
+                    ClusterCondition andalso NodePrecondition
+            end;
         false ->
             debug("general precondition fired for mod ~p and fun ~p and args ~p", [Mod, Fun, Args]),
             false
@@ -187,6 +207,14 @@ postcondition(_State, {call, ?MODULE, resolve_sync_partition, [_SourceNode, _Des
     debug("postcondition resolve_sync_partition: succeeded", []),
     %% Removed message filter.
     true;
+postcondition(_State, {call, ?MODULE, induce_cluster_partition, [_MajorityNodes, _MinorityNodes]}, ok) ->
+    debug("postcondition induce_cluster_partition: succeeded", []),
+    %% Added message filter.
+    true;
+postcondition(_State, {call, ?MODULE, resolve_cluster_partition, [_MajorityNodes, _MinorityNodes]}, ok) ->
+    debug("postcondition resolve_cluster_partition: succeeded", []),
+    %% Removed message filter.
+    true;
 postcondition(_State, {call, ?MODULE, join_cluster, [_Node, _JoinedNodes]}, ok) ->
     debug("postcondition join_cluster: succeeded", []),
     %% Accept joins that succeed.
@@ -195,12 +223,12 @@ postcondition(_State, {call, ?MODULE, leave_cluster, [_Node, _JoinedNodes]}, ok)
     debug("postcondition leave_cluster: succeeded", []),
     %% Accept leaves that succeed.
     true;
-postcondition(#state{node_state=NodeState}, {call, _Mod, Fun, _Args}=Call, Res) -> 
+postcondition(#state{node_state=NodeState}, {call, Mod, Fun, _Args}=Call, Res) -> 
     case lists:member(Fun, node_functions()) of
         true ->
             node_postcondition(NodeState, Call, Res);
         false ->
-            debug("general postcondition fired with response ~p", [Res]),
+            debug("general postcondition fired for ~p:~p with response ~p", [Mod, Fun, Res]),
             %% All other commands pass.
             false
     end.
@@ -222,11 +250,11 @@ next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, 
 next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
     MinorityNodes = AllNodes -- MajorityNodes,
     MessageFilters = add_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters0),
-    State#state{message_filters=MessageFilters};
+    State#state{message_filters=MessageFilters, majority_nodes=MajorityNodes, minority_nodes=MinorityNodes};
 next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
     MinorityNodes = AllNodes -- MajorityNodes,
     MessageFilters = delete_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters0),
-    State#state{message_filters=MessageFilters};
+    State#state{message_filters=MessageFilters, majority_nodes=[], minority_nodes=[]};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
         true ->
