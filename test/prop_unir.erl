@@ -94,13 +94,17 @@ precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_sync_pa
     not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
     is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+    MinorityNodes = AllNodes -- MajorityNodes,
+
     lists:all(fun(SourceNode) -> 
         lists:all(fun(DestinationNode) ->
             not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters)
         end, MinorityNodes)
     end, MajorityNodes);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+    MinorityNodes = AllNodes -- MajorityNodes,
+
     lists:all(fun(SourceNode) -> 
         lists:all(fun(DestinationNode) ->
             is_involved_in_partition(SourceNode, DestinationNode, MessageFilters)
@@ -215,10 +219,12 @@ next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, 
 next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
     MessageFilters = delete_sync_partition(SourceNode, DestinationNode, MessageFilters0),
     State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+    MinorityNodes = AllNodes -- MajorityNodes,
     MessageFilters = add_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters0),
     State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_cluster_partition, [MajorityNodes, MinorityNodes]}) -> 
+next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+    MinorityNodes = AllNodes -- MajorityNodes,
     MessageFilters = delete_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters0),
     State#state{message_filters=MessageFilters};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
@@ -584,22 +590,28 @@ add_sync_partition(SourceNode, DestinationNode, MessageFilters) ->
 add_async_partition(SourceNode, DestinationNode, MessageFilters) ->
     dict:store({SourceNode, DestinationNode}, true, MessageFilters).
 
-add_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters) ->
+add_cluster_partition(MajorityNodes, AllNodes, MessageFilters) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+
     lists:foldl(fun(SourceNode, Filters) ->
         lists:foldl(fun(DestinationNode, Filters2) ->
             add_sync_partition(SourceNode, DestinationNode, Filters2)
             end, Filters, MinorityNodes)
         end, MessageFilters, MajorityNodes).
 
-delete_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters) ->
+delete_cluster_partition(MajorityNodes, AllNodes, MessageFilters) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+
     lists:foldl(fun(SourceNode, Filters) ->
         lists:foldl(fun(DestinationNode, Filters2) ->
             delete_sync_partition(SourceNode, DestinationNode, Filters2)
             end, Filters, MinorityNodes)
         end, MessageFilters, MajorityNodes).
 
-induce_cluster_partition(MajorityNodes, MinorityNodes) ->
+induce_cluster_partition(MajorityNodes, AllNodes) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
     debug("induce_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
+
     Results = lists:flatmap(fun(SourceNode) ->
         lists:flatmap(fun(DestinationNode) ->
             [
@@ -610,7 +622,9 @@ induce_cluster_partition(MajorityNodes, MinorityNodes) ->
         end, MajorityNodes),
     all_to_ok_or_error(Results).
 
-resolve_cluster_partition(MajorityNodes, MinorityNodes) ->
+resolve_cluster_partition(MajorityNodes, AllNodes) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+
     debug("resolve_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
     Results = lists:flatmap(fun(SourceNode) ->
         lists:flatmap(fun(DestinationNode) ->
