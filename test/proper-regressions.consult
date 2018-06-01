@@ -1,0 +1,13 @@
+
+{prop_unir,prop_sequential,
+           [[{set,{var,1},
+                  {call,prop_unir,write_object,[node_1,<<"key">>,<<>>]}},
+             {set,{var,2},
+                  {call,prop_unir,induce_cluster_partition,
+                        [[node_1,node_2],[node_1,node_2,node_3]]}},
+             {set,{var,3},
+                  {call,prop_unir,resolve_cluster_partition,
+                        [[node_1,node_2],[node_1,node_2,node_3]]}},
+             {set,{var,4},
+                  {call,prop_unir,write_object,[node_2,<<"key">>,<<>>]}},
+             {set,{var,5},{call,prop_unir,read_object,[node_3,<<"key">>]}}]]}.
