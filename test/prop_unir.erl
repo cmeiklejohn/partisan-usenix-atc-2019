@@ -1,5 +1,3 @@
-%% TODO: Sync partition code is wrong because it only checks one direction.
-%%
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2017 Christopher S. Meiklejohn.  All Rights Reserved.
@@ -223,10 +221,21 @@ postcondition(_State, {call, ?MODULE, leave_cluster, [_Node, _JoinedNodes]}, ok)
     debug("postcondition leave_cluster: succeeded", []),
     %% Accept leaves that succeed.
     true;
-postcondition(#state{node_state=NodeState}, {call, Mod, Fun, _Args}=Call, Res) -> 
+postcondition(#state{minority_nodes=MinorityNodes, node_state=NodeState}, {call, Mod, Fun, [Node|_]=_Args}=Call, Res) -> 
     case lists:member(Fun, node_functions()) of
         true ->
-            node_postcondition(NodeState, Call, Res);
+            case lists:member(Node, MinorityNodes) of
+                true ->
+                    case Res of
+                        {error, _} ->
+                            true;
+                        _ ->
+                            debug("node postcondition for ~p, operation succeeded, should have failed.", [Fun]),
+                            false
+                    end;
+                false ->
+                    node_postcondition(NodeState, Call, Res)
+            end;
         false ->
             debug("general postcondition fired for ~p:~p with response ~p", [Mod, Fun, Res]),
             %% All other commands pass.
@@ -359,13 +368,19 @@ read_object(Node, Key) ->
     debug("read_object: node ~p key ~p", [Node, Key]),
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
-induce_async_partition(SourceNode, DestinationNode) ->
-    debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+induce_async_partition(SourceNode, DestinationNode0) ->
+    debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode0]),
+
+    %% Convert to real node name and not symbolic name.
+    DestinationNode = name_to_nodename(DestinationNode0),
+
     MessageFilterFun = fun({N, _}) ->
         case N of
             DestinationNode ->
+                lager:info("Dropping packet from ~p to ~p due to filter.", [SourceNode, DestinationNode]),
                 false;
-            _ ->
+            OtherNode ->
+                lager:info("Allowing message, doesn't match filter as destination is ~p and not ~p", [OtherNode, DestinationNode]),
                 true
         end
     end,
@@ -548,6 +563,7 @@ node_postcondition(_NodeState, {call, ?MODULE, read_object, [Node, Key]}, {error
     %% Fail timed out reads.
     false;
 node_postcondition(_NodeState, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
+    debug("write_object returned ok", []),
     %% Only pass acknowledged writes.
     true;
 node_postcondition(_NodeState, {call, ?MODULE, write_object, [Node, Key, Value]}, {error, timeout}) -> 
