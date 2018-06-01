@@ -19,12 +19,12 @@
 -define(PERFORM_LEAVES_AND_JOINS, false).
 
 %% Only one of the modes below should be selected for proper shriking.
--define(PERFORM_CLUSTER_PARTITIONS, true).
+-define(PERFORM_CLUSTER_PARTITIONS, false).
 -define(PERFORM_ASYNC_PARTITIONS, false).
--define(PERFORM_SYNC_PARTITIONS, false).
+-define(PERFORM_SYNC_PARTITIONS, true).
 
 %% Other options to exercise pathological cases.
--define(BIAS_MINORITY, true).
+-define(BIAS_MINORITY, false).
 
 -export([command/1, 
          initial_state/0, 
@@ -167,10 +167,10 @@ precondition(#state{majority_nodes=MajorityNodes, minority_nodes=MinorityNodes, 
         true ->
             case ?BIAS_MINORITY andalso length(MinorityNodes) > 0 of
                 true ->
-                    debug("precondition fired for node function: ~p, bias_minority: ~p, node ~p is in minority", [Fun, ?BIAS_MINORITY, Node]),
+                    %% debug("precondition fired for node function: ~p, bias_minority: ~p, checking whether node ~p is in minority", [Fun, ?BIAS_MINORITY, Node]),
                     case lists:member(Node, MinorityNodes) of
                         true ->
-                            debug("=> bias towards minority, write is going to node ~p in minority", [Node]),
+                            %% debug("=> bias towards minority, write is going to node ~p in minority", [Node]),
                             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
                             NodePrecondition = node_precondition(NodeState, Call),
                             ClusterCondition andalso NodePrecondition;
@@ -571,8 +571,8 @@ node_postcondition(_NodeState, {call, ?MODULE, write_object, [_Node, _Key, _Valu
     debug("write_object returned ok", []),
     %% Only pass acknowledged writes.
     true;
-node_postcondition(_NodeState, {call, ?MODULE, write_object, [Node, Key, Value]}, {error, timeout}) -> 
-    debug("write_object ~p ~p timeout", [Node, Key, Value]),
+node_postcondition(_NodeState, {call, ?MODULE, write_object, [Node, Key, _Value]}, {error, timeout}) -> 
+    debug("write_object ~p ~p timeout", [Node, Key]),
     %% Consider timeouts as failures for now.
     false.
 

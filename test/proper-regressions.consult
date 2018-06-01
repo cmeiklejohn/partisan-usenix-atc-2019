@@ -11,3 +11,10 @@
              {set,{var,4},
                   {call,prop_unir,write_object,[node_2,<<"key">>,<<>>]}},
              {set,{var,5},{call,prop_unir,read_object,[node_3,<<"key">>]}}]]}.
+
+{prop_unir,prop_sequential,
+           [[{set,{var,1},
+                  {call,prop_unir,induce_sync_partition,[node_2,node_1]}},
+             {set,{var,2},
+                  {call,prop_unir,write_object,
+                        [node_2,<<"key">>,<<"Gñ­">>]}}]]}.
