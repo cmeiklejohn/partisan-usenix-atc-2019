@@ -161,7 +161,8 @@ precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node
             %% debug("precondition leave_cluster: no nodes left to remove.", []),
             false %% Might need to be changed when there's no read/write operations.
     end;
-precondition(#state{minority_nodes=MinorityNodes, node_state=NodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
+precondition(#state{majority_nodes=MajorityNodes, minority_nodes=MinorityNodes, node_state=NodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
+    debug("precondition fired for node function: ~p, majority_nodes: ~p, minority_nodes ~p", [Fun, MajorityNodes, MinorityNodes]),
     case lists:member(Fun, node_functions()) of
         true ->
             case ?BIAS_MINORITY andalso length(MinorityNodes) > 0 of
@@ -386,8 +387,12 @@ induce_async_partition(SourceNode, DestinationNode0) ->
     end,
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [{async, DestinationNode}, MessageFilterFun]).
 
-resolve_async_partition(SourceNode, DestinationNode) ->
-    debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
+resolve_async_partition(SourceNode, DestinationNode0) ->
+    debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode0]),
+
+    %% Convert to real node name and not symbolic name.
+    DestinationNode = name_to_nodename(DestinationNode0),
+
     rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [{async, DestinationNode}]).
 
 induce_sync_partition(SourceNode, DestinationNode) ->
