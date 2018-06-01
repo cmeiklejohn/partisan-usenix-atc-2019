@@ -167,7 +167,7 @@ precondition(#state{majority_nodes=MajorityNodes, minority_nodes=MinorityNodes, 
         true ->
             case ?BIAS_MINORITY andalso length(MinorityNodes) > 0 of
                 true ->
-                    %% debug("precondition fired for node function: ~p, bias_minority: ~p, checking whether node ~p is in minority", [Fun, ?BIAS_MINORITY, Node]),
+                    debug("precondition fired for node function where minority is biased: ~p, bias_minority: ~p, checking whether node ~p is in minority", [Fun, ?BIAS_MINORITY, Node]),
                     case lists:member(Node, MinorityNodes) of
                         true ->
                             %% debug("=> bias towards minority, write is going to node ~p in minority", [Node]),
@@ -222,7 +222,7 @@ postcondition(_State, {call, ?MODULE, leave_cluster, [_Node, _JoinedNodes]}, ok)
     debug("postcondition leave_cluster: succeeded", []),
     %% Accept leaves that succeed.
     true;
-postcondition(#state{minority_nodes=MinorityNodes, node_state=NodeState}, {call, Mod, Fun, [Node|_]=_Args}=Call, Res) -> 
+postcondition(#state{minority_nodes=MinorityNodes, message_filters=MessageFilters, node_state=NodeState}, {call, Mod, Fun, [Node|_]=_Args}=Call, Res) -> 
     case lists:member(Fun, node_functions()) of
         true ->
             case lists:member(Node, MinorityNodes) of
@@ -235,9 +235,20 @@ postcondition(#state{minority_nodes=MinorityNodes, node_state=NodeState}, {call,
                             false
                     end;
                 false ->
-                    node_postcondition(NodeState, Call, Res)
-            end;
-        false ->
+                    %% One partitioned node makes a quorum of 2 fail.
+                    case is_involved_in_x_partitions(Node, 1, MessageFilters) of
+                        true ->
+                            case Res of
+                                {error, _} ->
+                                    true;
+                                _ ->
+                                    false
+                            end;
+                        false ->
+                            node_postcondition(NodeState, Call, Res)
+                    end
+        end;
+    false ->
             debug("general postcondition fired for ~p:~p with response ~p", [Mod, Fun, Res]),
             %% All other commands pass.
             false
@@ -684,3 +695,15 @@ resolve_cluster_partition(MajorityNodes, AllNodes) ->
             end, MinorityNodes)
         end, MajorityNodes),
     all_to_ok_or_error(Results).
+
+is_involved_in_x_partitions(Node, X, MessageFilters) ->
+    Count = dict:fold(fun(Key, Value, AccIn) ->
+            case Key of
+                {Node, _} ->
+                    AccIn + 1;
+                _ ->
+                    AccIn
+            end
+        end, 0, MessageFilters),
+    debug("is_involved_in_x_partitions is ~p and should be ~p", [Count, X]),
+    Count >= X.
