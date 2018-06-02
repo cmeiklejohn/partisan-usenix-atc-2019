@@ -12,6 +12,9 @@ PROJECT_ID 		 ?= partisan-203021
 compile:
 	$(REBAR) compile
 
+test-workflow: kill
+	./rebar3 proper -m prop_unir -p prop_sequential --noshrink
+
 gcloud-build:
 	docker build -t gcr.io/$(PROJECT_ID)/unir:v1 .
 	gcloud docker -- push gcr.io/$(PROJECT_ID)/unir:v1
