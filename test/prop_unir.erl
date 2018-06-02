@@ -96,7 +96,7 @@ precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_async_p
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
     is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
-    not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
+    not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters) andalso is_valid_partition(SourceNode, DestinationNode);
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
     is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
 precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
@@ -235,14 +235,16 @@ postcondition(#state{minority_nodes=MinorityNodes, message_filters=MessageFilter
                             false
                     end;
                 false ->
-                    %% One partitioned node makes a quorum of 2 fail.
+                    debug("request went to majority node, node: ~p response: ~p", [Node, Res]),
+
+                    %% One partitioned node may make a quorum of 2 fail.
                     case is_involved_in_x_partitions(Node, 1, MessageFilters) of
                         true ->
                             case Res of
                                 {error, _} ->
                                     true;
-                                _ ->
-                                    false
+                                {ok, _} ->
+                                    true
                             end;
                         false ->
                             node_postcondition(NodeState, Call, Res)
@@ -697,7 +699,7 @@ resolve_cluster_partition(MajorityNodes, AllNodes) ->
     all_to_ok_or_error(Results).
 
 is_involved_in_x_partitions(Node, X, MessageFilters) ->
-    Count = dict:fold(fun(Key, Value, AccIn) ->
+    Count = dict:fold(fun(Key, _Value, AccIn) ->
             case Key of
                 {Node, _} ->
                     AccIn + 1;
@@ -707,3 +709,6 @@ is_involved_in_x_partitions(Node, X, MessageFilters) ->
         end, 0, MessageFilters),
     debug("is_involved_in_x_partitions is ~p and should be ~p", [Count, X]),
     Count >= X.
+
+is_valid_partition(SourceNode, DestinationNode) ->
+    SourceNode =/= DestinationNode.
