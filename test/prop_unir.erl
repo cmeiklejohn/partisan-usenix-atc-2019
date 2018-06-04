@@ -23,6 +23,11 @@
 -define(PERFORM_ASYNC_PARTITIONS, false).
 -define(PERFORM_SYNC_PARTITIONS, true).
 
+%% Partisan connection and forwarding settings.
+-define(VNODE_PARTITIONING, false).
+-define(PARALLELISM, 1).
+-define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
+
 %% Other options to exercise pathological cases.
 -define(BIAS_MINORITY, false).
 
@@ -323,7 +328,8 @@ key() ->
     oneof([<<"key">>]).
 
 value() ->
-    binary().
+    ?LET(Binary, binary(), 
+        {erlang:timestamp(), Binary}).
 
 %%%===================================================================
 %%% Helper Functions
@@ -335,10 +341,11 @@ start_nodes() ->
 
     %% Special configuration for the cluster.
     Config = [{partisan_dispatch, true},
-              {parallelism, 1},
+              {parallelism, ?PARALLELISM},
               {tls, false},
               {binary_padding, false},
-              {vnode_partitioning, false},
+              {channels, ?CHANNELS},
+              {vnode_partitioning, ?VNODE_PARTITIONING},
               {disable_fast_forward, true}],
 
     %% Initialize a cluster.
@@ -550,7 +557,7 @@ node_commands() ->
 
 %% What should the initial node state be.
 node_initial_state() ->
-    dict:new().
+    {dict:new(), dict:new()}.
 
 %% Names of the node functions so we kow when we can dispatch to the node
 %% pre- and postconditions.
@@ -558,52 +565,59 @@ node_functions() ->
     lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, node_commands()).
 
 %% Postconditions for node commands.
-node_postcondition(NodeState, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
+node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
     debug("read_object: returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
-    case dict:find(Key, NodeState) of
+    case dict:find(Key, DatabaseState) of
         {ok, KeyValues} ->
             ItWasWritten = lists:member(Value, KeyValues),
             debug("read_object: value read in write history: ~p", [ItWasWritten]),
-            ItWasWritten;
+            case ItWasWritten of
+                true ->
+                    is_monotonic_read(Key, Value, ClientState);
+                false ->
+                    false
+            end;
         _ ->
             case Value of
                 not_found ->
-                    debug("read_object: object wasn't written yet, not_found OK", []),
-                    true;
+                    debug("read_object: object wasn't written yet, not_found might be OK", []),
+                    is_monotonic_read(Key, Value, ClientState);
                 _ ->
                     debug("read_object: consistency violation, object was not written but was read", []),
                     false
             end
     end;
-node_postcondition(_NodeState, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
     debug("read_object ~p ~p timeout", [Node, Key]),
     %% Fail timed out reads.
     false;
-node_postcondition(_NodeState, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
     debug("write_object returned ok", []),
     %% Only pass acknowledged writes.
     true;
-node_postcondition(_NodeState, {call, ?MODULE, write_object, [Node, Key, _Value]}, {error, timeout}) -> 
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object, [Node, Key, _Value]}, {error, timeout}) -> 
     debug("write_object ~p ~p timeout", [Node, Key]),
     %% Consider timeouts as failures for now.
     false.
 
 %% Precondition.
-node_precondition(_NodeState, {call, _Mod, read_object, [_Node, _Key]}) -> 
+node_precondition({_DatabaseState, _ClientState}, {call, _Mod, read_object, [_Node, _Key]}) -> 
     true;
-node_precondition(_NodeState, {call, _Mod, write_object, [_Node, _Key, _Value]}) -> 
+node_precondition({_DatabaseState, _ClientState}, {call, _Mod, write_object, [_Node, _Key, _Value]}) -> 
     true.
 
 %% Next state.
 
 %% Reads don't modify state.
-node_next_state(NodeState, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
-    NodeState;
+node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
+    {DatabaseState, ClientState};
 
 %% All we know is that the write was acknowledged at *some* of the nodes.
-node_next_state(NodeState, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
-    dict:append_list(Key, [Value], NodeState).
+node_next_state({DatabaseState0, ClientState0}, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
+    DatabaseState = dict:append_list(Key, [Value], DatabaseState0),
+    ClientState = dict:store(Key, Value, ClientState0),
+    {DatabaseState, ClientState}.
 
 %% Determine if a bunch of operations succeeded or failed.
 all_to_ok_or_error(List) ->
@@ -712,3 +726,21 @@ is_involved_in_x_partitions(Node, X, MessageFilters) ->
 
 is_valid_partition(SourceNode, DestinationNode) ->
     SourceNode =/= DestinationNode.
+
+is_monotonic_read(Key, not_found, ClientState) ->
+    case dict:find(Key, ClientState) of
+        {ok, {_LastReadTimestamp, _LastReadBinary} = LastReadValue} ->
+            debug("got not_found, should have read ~p", [LastReadValue]),
+            false;
+        _ ->
+            true
+    end;
+is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
+    case dict:find(Key, ClientState) of
+        {ok, {LastReadTimestamp, _LastReadBinary} = LastReadValue} ->
+            Result = timer:now_diff(ReadTimestamp, LastReadTimestamp) >= 0,
+            debug("last read ~p now read ~p, result ~p", [LastReadValue, ReadValue, Result]),
+            Result;
+        _ ->
+            true
+    end.
