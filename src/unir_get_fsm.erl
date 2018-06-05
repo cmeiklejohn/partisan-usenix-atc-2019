@@ -93,7 +93,7 @@ init([ReqId, From, Key]) ->
                    key=Key,
                    coordinator=node(),
                    from=From,
-                   responses=0},
+                   responses=[]},
     {ok, prepare, State, 0}.
 
 prepare(timeout, #state{key=Key}=State) ->
@@ -110,11 +110,11 @@ execute(timeout, #state{preflist=Preflist,
     {next_state, waiting, State}.
 
 waiting({ok, ReqId, Value}, #state{responses=Responses0, from=From}=State0) ->
-    Responses = Responses0 + 1,
+    Responses = [Value|Responses0],
     State = State0#state{responses=Responses},
-    case Responses =:= ?W of
+    case length(Responses) =:= ?W of
         true ->
-            From ! {ReqId, ok, Value},
+            From ! {ReqId, ok, merge(Responses)},
             {stop, normal, State};
         false ->
             {next_state, waiting, State}
@@ -123,3 +123,23 @@ waiting({ok, ReqId, Value}, #state{responses=Responses0, from=From}=State0) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
+merge(Values) ->
+    lists:foldl(fun(Value, Acc) ->
+        case Value of
+            {Timestamp, Binary} ->
+                case Acc of
+                    {LastTimestamp, LastBinary} ->
+                        case timer:now_diff(Timestamp, LastTimestamp) >= 0 of
+                            true ->
+                                {Timestamp, Binary};
+                            false ->
+                                {LastTimestamp, LastBinary}
+                        end;
+                    _ ->
+                        Value
+                end;
+            Other ->
+                Other
+        end
+        end, undefined, Values).
