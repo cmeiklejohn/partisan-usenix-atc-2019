@@ -202,6 +202,15 @@ start(_Case, Config, Options) ->
                     ok
             end,
 
+            CausalLabels = ?config(causal_labels, Config),
+            case CausalLabels of
+                undefined ->
+                    ok = rpc:call(Node, partisan_config, set, [causal_labels, []]);
+                CausalLabels ->
+                    ok = rpc:call(Node, partisan_config, set, [causal_labels, CausalLabels]),
+                    ok = rpc:call(Node, partisan_config, set, [causal_delivery, true])
+            end,
+
             %% Configure vnode partitioning in Riak Core.
             VnodePartitioning = ?config(vnode_partitioning, Config),
             case VnodePartitioning of

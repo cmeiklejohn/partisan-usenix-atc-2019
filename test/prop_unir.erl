@@ -27,6 +27,7 @@
 -define(VNODE_PARTITIONING, false).
 -define(PARALLELISM, 1).
 -define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
+-define(CAUSAL_LABELS, [vnode]).
 
 %% Other options to exercise pathological cases.
 -define(BIAS_MINORITY, false).
@@ -346,6 +347,7 @@ start_nodes() ->
               {binary_padding, false},
               {channels, ?CHANNELS},
               {vnode_partitioning, ?VNODE_PARTITIONING},
+              {causal_labels, ?CAUSAL_LABELS},
               {disable_fast_forward, true}],
 
     %% Initialize a cluster.
@@ -735,6 +737,9 @@ is_monotonic_read(Key, not_found, ClientState) ->
         _ ->
             true
     end;
+%% Old style tests.
+is_monotonic_read(_Key, Binary, _ClientState) when is_binary(Binary) ->
+    true;
 is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
     case dict:find(Key, ClientState) of
         {ok, {LastReadTimestamp, _LastReadBinary} = LastReadValue} ->
