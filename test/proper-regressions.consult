@@ -27,3 +27,41 @@
                         [node_3,<<"key">>,
                          {{1528,268940,843086},
                           <<151,119,205,24,47,253,35,157,34,218,84,177>>}]}}]]}.
+
+{prop_unir,prop_sequential,
+           [[{set,{var,1},
+                  {call,prop_unir,induce_sync_partition,[node_3,node_1]}},
+             {set,{var,2},
+                  {call,prop_unir,write_object,
+                        [node_1,<<"key">>,{{1528,392754,379054},<<>>}]}},
+             {set,{var,3},
+                  {call,prop_unir,induce_byzantine_fault,[node_1,<<"key">>]}},
+             {set,{var,4},{call,prop_unir,read_object,[node_3,<<"key">>]}}]]}.
+
+{prop_unir,prop_sequential,
+           [[{set,{var,1},
+                  {call,prop_unir,write_object,
+                        [node_1,<<"key">>,
+                         {{1528,523368,74593},
+                          <<172,103,177,59,235,214,85,178,131,111,116,157>>}]}},
+             {set,{var,2},{call,prop_unir,read_object,[node_2,<<"key">>]}},
+             {set,{var,3},{call,prop_unir,read_object,[node_1,<<"key">>]}},
+             {set,{var,4},
+                  {call,prop_unir,induce_byzantine_fault,[node_3,<<"key">>]}},
+             {set,{var,5},
+                  {call,prop_unir,induce_sync_partition,[node_2,node_3]}},
+             {set,{var,6},
+                  {call,prop_unir,resolve_sync_partition,[node_3,node_2]}},
+             {set,{var,7},{call,prop_unir,read_object,[node_2,<<"key">>]}},
+             {set,{var,8},
+                  {call,prop_unir,induce_byzantine_fault,[node_1,<<"key">>]}},
+             {set,{var,9},
+                  {call,prop_unir,induce_byzantine_fault,[node_3,<<"key">>]}},
+             {set,{var,10},
+                  {call,prop_unir,induce_sync_partition,[node_3,node_1]}}]]}.
+
+{prop_unir,prop_sequential,
+           [[{set,{var,1},{call,prop_unir,read_object,[node_2,<<"key">>]}},
+             {set,{var,2},
+                  {call,prop_unir,induce_byzantine_fault,[node_1,<<"key">>]}},
+             {set,{var,3},{call,prop_unir,read_object,[node_2,<<"key">>]}}]]}.
