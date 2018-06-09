@@ -70,7 +70,7 @@
   0},
  {<<"riak_core_partisan_utils">>,
   {git,"git://github.com/lasp-lang/riak_core_partisan_utils",
-       {ref,"f50fee734bdb03311fd727abb604afa0ef5c223b"}},
+       {ref,"c1e4941a60796dcf754c7eb9df61fb17b1c5498e"}},
   0},
  {<<"riak_ensemble">>,
   {git,"git://github.com/Kyorai/riak_ensemble",
