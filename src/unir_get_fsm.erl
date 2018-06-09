@@ -127,6 +127,17 @@ waiting({ok, ReqId, Value}, #state{responses=Responses0, from=From}=State0) ->
 merge(Values) ->
     lists:foldl(fun(Value, Acc) ->
         case Value of
+
+            %% Values override not_found, but undefined doesn't.
+            not_found ->
+                case Acc of
+                    undefined ->
+                        Value;
+                    Acc ->
+                        Acc
+                end;
+
+            %% Timestamps that are larger override timestamps that are younger.
             {Timestamp, Binary} ->
                 case Acc of
                     {LastTimestamp, LastBinary} ->
@@ -139,7 +150,10 @@ merge(Values) ->
                     _ ->
                         Value
                 end;
+
+            %% Otherwise, a value.
             Other ->
                 Other
         end
+
         end, undefined, Values).
