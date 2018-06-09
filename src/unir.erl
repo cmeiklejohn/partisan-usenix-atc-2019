@@ -11,7 +11,8 @@
          fsm_get/1,
          fsm_put/2,
          echo/0,
-         echo/1
+         echo/1,
+         nuke/1
         ]).
 
 -ignore_xref([
@@ -78,6 +79,11 @@ fsm_put(Key, Value) ->
 %% @doc Make a request through the get FSM.
 fsm_get(Key) ->
     {ok, ReqId} = unir_get_fsm:get(Key),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Nuke state.
+nuke(Key) ->
+    {ok, ReqId} = unir_nuke_fsm:get(Key),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %%%===================================================================

@@ -7,7 +7,8 @@
          init/1,
          ping/2,
          put/4,
-         get/3]).
+         get/3,
+         nuke/3]).
 
 -export([terminate/2,
          handle_command/3,
@@ -50,6 +51,12 @@ get(Preflist, Identity, Key) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
+nuke(Preflist, Identity, Key) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {nuke, Identity, Key},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
 ping(Preflist, Identity) ->
     riak_core_vnode_master:command(Preflist,
                                    {ping, Identity},
@@ -62,6 +69,12 @@ handle_command({put, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=Stat
     timer:sleep(10),
     Store = dict:store(Key, Value, Store0),
     {reply, {ok, ReqId, Value}, State#state{store=Store}};
+handle_command({nuke, {ReqId, _}, Key}, _Sender, #state{store=Store0}=State) ->
+    %% Sleep for 10ms, read 1MB from disk.
+    %% https://gist.github.com/jboner/2841832
+    timer:sleep(10),
+    Store = dict:erase(Key, Store0),
+    {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store}=State) ->
     %% Sleep for 10ms, read 1MB from disk.
     %% https://gist.github.com/jboner/2841832
