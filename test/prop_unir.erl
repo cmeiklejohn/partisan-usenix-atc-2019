@@ -22,6 +22,7 @@
 -define(PERFORM_CLUSTER_PARTITIONS, false).
 -define(PERFORM_ASYNC_PARTITIONS, false).
 -define(PERFORM_SYNC_PARTITIONS, true).
+-define(PERFORM_BYZANTINE_FAULTS, true).
 
 %% Partisan connection and forwarding settings.
 -define(VNODE_PARTITIONING, false).
@@ -248,6 +249,8 @@ postcondition(#state{minority_nodes=MinorityNodes, message_filters=MessageFilter
                         true ->
                             case Res of
                                 {error, _} ->
+                                    true;
+                                ok ->
                                     true;
                                 {ok, _} ->
                                     true
@@ -544,7 +547,10 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
             []
     end,
 
-    MemberCommands ++ AsyncPartitionCommands ++ SyncPartitionCommands ++ ClusterPartitionCommands.
+    MemberCommands ++ 
+        AsyncPartitionCommands ++ 
+        SyncPartitionCommands ++ 
+        ClusterPartitionCommands.
 
 %%%===================================================================
 %%% Node Functions
@@ -552,10 +558,21 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 
 %% What node-specific operations should be called.
 node_commands() ->
+    ByzantineCommands = case ?PERFORM_BYZANTINE_FAULTS of
+        true ->
+            [
+            {call, ?MODULE, induce_byzantine_fault, [node_name(), key()]}
+            ];
+        false ->
+            []
+    end,
+
     [
      {call, ?MODULE, read_object, [node_name(), key()]},
      {call, ?MODULE, write_object, [node_name(), key(), value()]}
-    ].
+    ] ++
+
+    ByzantineCommands.
 
 %% What should the initial node state be.
 node_initial_state() ->
@@ -590,10 +607,9 @@ node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_
                     false
             end
     end;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
-    debug("read_object ~p ~p timeout", [Node, Key]),
-    %% Fail timed out reads.
-    false;
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_fault, [Node, Key]}, ok) -> 
+    debug("induce_byzantine_fault: ~p ~p", [Node, Key]),
+    true;
 node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
     debug("write_object returned ok", []),
     %% Only pass acknowledged writes.
@@ -604,6 +620,8 @@ node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object,
     false.
 
 %% Precondition.
+node_precondition({_DatabaseState, _ClientState}, {call, _Mod, induce_byzantine_fault, [_Node, _Key]}) -> 
+    true;
 node_precondition({_DatabaseState, _ClientState}, {call, _Mod, read_object, [_Node, _Key]}) -> 
     true;
 node_precondition({_DatabaseState, _ClientState}, {call, _Mod, write_object, [_Node, _Key, _Value]}) -> 
@@ -612,6 +630,9 @@ node_precondition({_DatabaseState, _ClientState}, {call, _Mod, write_object, [_N
 %% Next state.
 
 %% Reads don't modify state.
+node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_fault, [_Node, _Key]}) -> 
+    {DatabaseState, ClientState};
+
 node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
     {DatabaseState, ClientState};
 
@@ -749,3 +770,6 @@ is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
         _ ->
             true
     end.
+
+induce_byzantine_fault(Node, Key) ->
+    rpc:call(name_to_nodename(Node), unir, nuke, [Key]).
