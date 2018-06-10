@@ -60,7 +60,7 @@ nuke(Preflist, Identity, Key) ->
 
 alter(Preflist, Identity, Key, Value) ->
     riak_core_vnode_master:command(Preflist,
-                                   {nuke, Identity, Key, Value},
+                                   {alter, Identity, Key, Value},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -77,15 +77,9 @@ handle_command({put, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=Stat
     Store = dict:store(Key, Value, Store0),
     {reply, {ok, ReqId, Value}, State#state{store=Store}};
 handle_command({nuke, {ReqId, _}, Key}, _Sender, #state{store=Store0}=State) ->
-    %% Sleep for 10ms, read 1MB from disk.
-    %% https://gist.github.com/jboner/2841832
-    timer:sleep(10),
     Store = dict:erase(Key, Store0),
     {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({alter, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
-    %% Sleep for 10ms, read 1MB from disk.
-    %% https://gist.github.com/jboner/2841832
-    timer:sleep(10),
     Store = dict:store(Key, Value, Store0),
     {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store}=State) ->
