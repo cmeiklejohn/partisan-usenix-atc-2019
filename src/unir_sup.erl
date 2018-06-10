@@ -40,4 +40,8 @@ init(_Args) ->
                {unir_nuke_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [unir_nuke_fsm_sup]},
 
-    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM, PutFSM, GetFSM, NukeFSM]}}.
+    AlterFSM = {unir_alter_fsm_sup,
+                {unir_alter_fsm_sup, start_link, []},
+                 permanent, infinity, supervisor, [unir_alter_fsm_sup]},
+
+    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM, PutFSM, GetFSM, NukeFSM, AlterFSM]}}.

@@ -12,7 +12,8 @@
          fsm_put/2,
          echo/0,
          echo/1,
-         nuke/1
+         nuke/1,
+         alter/2
         ]).
 
 -ignore_xref([
@@ -83,7 +84,12 @@ fsm_get(Key) ->
 
 %% @doc Nuke state.
 nuke(Key) ->
-    {ok, ReqId} = unir_nuke_fsm:get(Key),
+    {ok, ReqId} = unir_nuke_fsm:nuke(Key),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Alter state.
+alter(Key, Value) ->
+    {ok, ReqId} = unir_alter_fsm:alter(Key, Value),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %%%===================================================================

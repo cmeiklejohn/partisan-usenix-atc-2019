@@ -18,14 +18,14 @@
 %%
 %% -------------------------------------------------------------------
 
--module(unir_nuke_fsm).
+-module(unir_alter_fsm).
 -author('Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>').
 
 -behaviour(gen_fsm).
 
 %% API
--export([start_link/3,
-         nuke/1]).
+-export([start_link/4,
+         alter/2]).
 
 %% Callbacks
 -export([init/1,
@@ -45,6 +45,7 @@
                 coordinator,
                 from,
                 key,
+                value,
                 responses}).
 
 -define(N, 3).
@@ -54,12 +55,13 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqId, From, Key) ->
-    gen_fsm:start_link(?MODULE, [ReqId, From, Key], []).
+start_link(ReqId, From, Key, Value) ->
+    gen_fsm:start_link(?MODULE, [ReqId, From, Key, Value], []).
 
-nuke(Key) ->
+%% @doc Join a pid to a group.
+alter(Key, Value) ->
     ReqId = unir:mk_reqid(),
-    _ = unir_nuke_fsm_sup:start_child([ReqId, self(), Key]),
+    _ = unir_alter_fsm_sup:start_child([ReqId, self(), Key, Value]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -86,10 +88,11 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 %% @doc Initialize the request.
-init([ReqId, From, Key]) ->
+init([ReqId, From, Key, Value]) ->
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    key=Key,
+                   value=Value,
                    coordinator=node(),
                    from=From,
                    responses=[]},
@@ -104,8 +107,9 @@ prepare(timeout, #state{key=Key}=State) ->
 execute(timeout, #state{preflist=Preflist,
                         req_id=ReqId,
                         key=Key,
+                        value=Value,
                         coordinator=Coordinator}=State) ->
-    unir_vnode:nuke(Preflist, {ReqId, Coordinator}, Key),
+    unir_vnode:alter(Preflist, {ReqId, Coordinator}, Key, Value),
     {next_state, waiting, State}.
 
 waiting({ok, ReqId}, #state{from=From}=State) ->
