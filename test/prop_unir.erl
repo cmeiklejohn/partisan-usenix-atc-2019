@@ -6,6 +6,7 @@
 
 -module(prop_unir).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
+
 -include_lib("proper/include/proper.hrl").
 
 -compile([export_all]).
@@ -561,7 +562,8 @@ node_commands() ->
     ByzantineCommands = case ?PERFORM_BYZANTINE_FAULTS of
         true ->
             [
-            {call, ?MODULE, induce_byzantine_fault, [node_name(), key()]}
+            {call, ?MODULE, induce_byzantine_disk_loss_fault, [node_name(), key()]},
+            {call, ?MODULE, induce_byzantine_bit_flip_fault, [node_name(), key(), value()]}
             ];
         false ->
             []
@@ -607,8 +609,11 @@ node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_
                     false
             end
     end;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_fault, [Node, Key]}, ok) -> 
-    debug("induce_byzantine_fault: ~p ~p", [Node, Key]),
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_bit_flip_fault, [Node, Key, Value]}, ok) -> 
+    debug("induce_byzantine_bit_flip_fault: ~p ~p ~p", [Node, Key, Value]),
+    true;
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_disk_loss_fault, [Node, Key]}, ok) -> 
+    debug("induce_byzantine_disk_loss_fault: ~p ~p", [Node, Key]),
     true;
 node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
     debug("write_object returned ok", []),
@@ -620,7 +625,9 @@ node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object,
     false.
 
 %% Precondition.
-node_precondition({_DatabaseState, _ClientState}, {call, _Mod, induce_byzantine_fault, [_Node, _Key]}) -> 
+node_precondition({_DatabaseState, _ClientState}, {call, _Mod, induce_byzantine_disk_loss_fault, [_Node, _Key]}) -> 
+    true;
+node_precondition({_DatabaseState, _ClientState}, {call, _Mod, induce_byzantine_bit_flip_fault, [_Node, _Key, _Value]}) -> 
     true;
 node_precondition({_DatabaseState, _ClientState}, {call, _Mod, read_object, [_Node, _Key]}) -> 
     true;
@@ -630,7 +637,10 @@ node_precondition({_DatabaseState, _ClientState}, {call, _Mod, write_object, [_N
 %% Next state.
 
 %% Reads don't modify state.
-node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_fault, [_Node, _Key]}) -> 
+node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_disk_loss_fault, [_Node, _Key]}) -> 
+    {DatabaseState, ClientState};
+
+node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_bit_flip_fault, [_Node, _Key, _Value]}) -> 
     {DatabaseState, ClientState};
 
 node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
@@ -771,5 +781,8 @@ is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
             true
     end.
 
-induce_byzantine_fault(Node, Key) ->
+induce_byzantine_disk_loss_fault(Node, Key) ->
     rpc:call(name_to_nodename(Node), unir, nuke, [Key]).
+
+induce_byzantine_bit_flip_fault(Node, Key, Value) ->
+    rpc:call(name_to_nodename(Node), unir, alter, [Key, Value]).
