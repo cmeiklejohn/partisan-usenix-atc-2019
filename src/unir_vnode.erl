@@ -81,7 +81,7 @@ handle_command({nuke, {ReqId, _}, Key}, _Sender, #state{store=Store0}=State) ->
     {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({alter, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
     Store = case dict:find(Key, Store0) of
-        {ok, Value} ->
+        {ok, _} ->
             dict:store(Key, Value, Store0);
         error ->
             Store0
