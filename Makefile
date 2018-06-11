@@ -16,16 +16,19 @@ test-workflow: kill
 	./rebar3 proper -m prop_unir -p prop_sequential --noshrink
 
 gcloud-build:
-	docker build -t gcr.io/$(PROJECT_ID)/unir:v1 .
+	docker build --no-cache -t gcr.io/$(PROJECT_ID)/unir:v1 .
 	gcloud docker -- push gcr.io/$(PROJECT_ID)/unir:v1
 
-gcloud-deploy: gcloud-build
+gcloud-deploy:
+	@read -s -p "Please make sure you've run gcloud-build and then hit enter to continue..."
 	yes | gcloud container clusters delete unir; exit 0
-	gcloud container clusters create unir
+	gcloud container clusters create unir --machine-type n1-highcpu-16	
 	gcloud container clusters get-credentials unir
+	sleep 20
 	bin/kube
 
-gcloud-redeploy: gcloud-build
+gcloud-redeploy:
+	@read -s -p "Please make sure you've run gcloud-build and then hit enter to continue..."
 	kubectl delete -f /tmp/unir.yaml
 	bin/kube
 

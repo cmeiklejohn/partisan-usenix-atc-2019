@@ -18,7 +18,7 @@ CMD echo "${GIST_TOKEN}" > /root/.gist && \
     cd /opt/unir && \
     git pull && \
     make && \
-    (./rebar3 proper -m prop_unir -p prop_sequential; exit 0) | tee output-proper.txt && \
+    (ulimit -n 65534; ./rebar3 proper -m prop_unir -p prop_sequential; exit 0) | tee output-proper.txt && \
     (make proper-logs; exit 0) | tee output-logs.txt && \
     chmod 755 bin/gist-results && \
     bin/gist-results
