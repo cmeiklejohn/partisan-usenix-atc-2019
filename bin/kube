@@ -6,7 +6,7 @@ kind: Deployment
 metadata:
   name: unir
 spec:
-  replicas: 6
+  replicas: 3
   template:
     metadata:
       labels:
