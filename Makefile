@@ -21,6 +21,7 @@ gcloud-build:
 
 gcloud-deploy:
 	@read -s -p "Please make sure you've run gcloud-build and then hit enter to continue..."
+	@echo
 	yes | gcloud container clusters delete unir; exit 0
 	gcloud container clusters create unir --machine-type n1-highcpu-16	
 	gcloud container clusters get-credentials unir
@@ -29,6 +30,7 @@ gcloud-deploy:
 
 gcloud-redeploy:
 	@read -s -p "Please make sure you've run gcloud-build and then hit enter to continue..."
+	@echo
 	kubectl delete -f /tmp/unir.yaml
 	bin/kube
 

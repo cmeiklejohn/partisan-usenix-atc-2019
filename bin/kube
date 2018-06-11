@@ -15,7 +15,7 @@ spec:
       containers:
       - name: unir
         image: gcr.io/partisan-203021/unir:v1
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         env:
         - name: GIST_TOKEN
           value: $GIST_TOKEN

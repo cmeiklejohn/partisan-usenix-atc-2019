@@ -4,7 +4,7 @@ MAINTAINER Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>
 
 RUN cd /tmp && \
     apt-get update && \
-    apt-get -y install wget build-essential make gcc ruby-dev git expect gnuplot tmux && \
+    apt-get -y install wget build-essential make gcc ruby-dev git expect gnuplot tmux strace && \
     gem install gist && \
     cd /opt && \
     git clone https://github.com/lasp-lang/unir.git && \

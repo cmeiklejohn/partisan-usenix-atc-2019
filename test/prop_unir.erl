@@ -29,7 +29,7 @@
 -define(VNODE_PARTITIONING, false).
 -define(PARALLELISM, 1).
 -define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
--define(CAUSAL_LABELS, [vnode]).
+-define(CAUSAL_LABELS, []).
 
 %% Other options to exercise pathological cases.
 -define(BIAS_MINORITY, false).
