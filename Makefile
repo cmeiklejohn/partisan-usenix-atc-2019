@@ -25,7 +25,7 @@ gcloud-deploy:
 	yes | gcloud container clusters delete unir; exit 0
 	gcloud container clusters create unir --machine-type n1-highcpu-16	
 	gcloud container clusters get-credentials unir
-	sleep 20
+	sleep 60
 	bin/kube
 
 gcloud-redeploy:
