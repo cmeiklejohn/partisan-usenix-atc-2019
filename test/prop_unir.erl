@@ -563,7 +563,7 @@ node_commands() ->
         true ->
             [
             {call, ?MODULE, induce_byzantine_disk_loss_fault, [node_name(), key()]},
-            {call, ?MODULE, induce_byzantine_bit_flip_fault, [node_name(), key(), value()]}
+            {call, ?MODULE, induce_byzantine_bit_flip_fault, [node_name(), key(), binary()]}
             ];
         false ->
             []
