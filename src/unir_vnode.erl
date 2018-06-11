@@ -80,7 +80,12 @@ handle_command({nuke, {ReqId, _}, Key}, _Sender, #state{store=Store0}=State) ->
     Store = dict:erase(Key, Store0),
     {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({alter, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
-    Store = dict:store(Key, Value, Store0),
+    Store = case dict:find(Key, Store0) of
+        {ok, Value} ->
+            dict:store(Key, Value, Store0);
+        error ->
+            Store0
+    end,
     {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store}=State) ->
     %% Sleep for 10ms, read 1MB from disk.
