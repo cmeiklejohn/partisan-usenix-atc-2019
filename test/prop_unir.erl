@@ -62,7 +62,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, node_state, message_filters, minority_nodes, majority_nodes}).
+-record(state, {joined_nodes, nodes, node_state, partition_filters, minority_nodes, majority_nodes}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -81,7 +81,7 @@ initial_state() ->
     end,
 
     %% Message filters.
-    MessageFilters = dict:new(),
+    PartitionFilters = dict:new(),
     MinorityNodes = [],
     MajorityNodes = [],
 
@@ -93,34 +93,34 @@ initial_state() ->
            minority_nodes=MinorityNodes,
            majority_nodes=MajorityNodes, 
            node_state=NodeState, 
-           message_filters=MessageFilters}.
+           partition_filters=PartitionFilters}.
 
 command(State) -> 
     ?LET(Commands, cluster_commands(State) ++ node_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
-    not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters) andalso is_valid_partition(SourceNode, DestinationNode);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
-    is_involved_in_partition(SourceNode, DestinationNode, MessageFilters);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+    not is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters);
+precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
+    is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters);
+precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
+    not is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters) andalso is_valid_partition(SourceNode, DestinationNode);
+precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
+    is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters);
+precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
     MinorityNodes = AllNodes -- MajorityNodes,
 
     lists:all(fun(SourceNode) -> 
         lists:all(fun(DestinationNode) ->
-            not is_involved_in_partition(SourceNode, DestinationNode, MessageFilters)
+            not is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters)
         end, MinorityNodes)
     end, MajorityNodes);
-precondition(#state{message_filters=MessageFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
     MinorityNodes = AllNodes -- MajorityNodes,
 
     lists:all(fun(SourceNode) -> 
         lists:all(fun(DestinationNode) ->
-            is_involved_in_partition(SourceNode, DestinationNode, MessageFilters)
+            is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters)
         end, MinorityNodes)
     end, MajorityNodes);
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
@@ -230,7 +230,7 @@ postcondition(_State, {call, ?MODULE, leave_cluster, [_Node, _JoinedNodes]}, ok)
     debug("postcondition leave_cluster: succeeded", []),
     %% Accept leaves that succeed.
     true;
-postcondition(#state{minority_nodes=MinorityNodes, message_filters=MessageFilters, node_state=NodeState}, {call, Mod, Fun, [Node|_]=_Args}=Call, Res) -> 
+postcondition(#state{minority_nodes=MinorityNodes, partition_filters=PartitionFilters, node_state=NodeState}, {call, Mod, Fun, [Node|_]=_Args}=Call, Res) -> 
     case lists:member(Fun, node_functions()) of
         true ->
             case lists:member(Node, MinorityNodes) of
@@ -246,7 +246,7 @@ postcondition(#state{minority_nodes=MinorityNodes, message_filters=MessageFilter
                     debug("request went to majority node, node: ~p response: ~p", [Node, Res]),
 
                     %% One partitioned node may make a quorum of 2 fail.
-                    case is_involved_in_x_partitions(Node, 1, MessageFilters) of
+                    case is_involved_in_x_partitions(Node, 1, PartitionFilters) of
                         true ->
                             case Res of
                                 {error, _} ->
@@ -268,26 +268,26 @@ postcondition(#state{minority_nodes=MinorityNodes, message_filters=MessageFilter
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = add_async_partition(SourceNode, DestinationNode, MessageFilters0),
-    State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = delete_async_partition(SourceNode, DestinationNode, MessageFilters0),
-    State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = add_sync_partition(SourceNode, DestinationNode, MessageFilters0),
-    State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
-    MessageFilters = delete_sync_partition(SourceNode, DestinationNode, MessageFilters0),
-    State#state{message_filters=MessageFilters};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
+    PartitionFilters = add_async_partition(SourceNode, DestinationNode, PartitionFilters0),
+    State#state{partition_filters=PartitionFilters};
+next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
+    PartitionFilters = delete_async_partition(SourceNode, DestinationNode, PartitionFilters0),
+    State#state{partition_filters=PartitionFilters};
+next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, induce_sync_partition, [SourceNode, DestinationNode]}) -> 
+    PartitionFilters = add_sync_partition(SourceNode, DestinationNode, PartitionFilters0),
+    State#state{partition_filters=PartitionFilters};
+next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, resolve_sync_partition, [SourceNode, DestinationNode]}) -> 
+    PartitionFilters = delete_sync_partition(SourceNode, DestinationNode, PartitionFilters0),
+    State#state{partition_filters=PartitionFilters};
+next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, induce_cluster_partition, [MajorityNodes, AllNodes]}) -> 
     MinorityNodes = AllNodes -- MajorityNodes,
-    MessageFilters = add_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters0),
-    State#state{message_filters=MessageFilters, majority_nodes=MajorityNodes, minority_nodes=MinorityNodes};
-next_state(#state{message_filters=MessageFilters0}=State, _Res, {call, ?MODULE, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
+    PartitionFilters = add_cluster_partition(MajorityNodes, MinorityNodes, PartitionFilters0),
+    State#state{partition_filters=PartitionFilters, majority_nodes=MajorityNodes, minority_nodes=MinorityNodes};
+next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, resolve_cluster_partition, [MajorityNodes, AllNodes]}) -> 
     MinorityNodes = AllNodes -- MajorityNodes,
-    MessageFilters = delete_cluster_partition(MajorityNodes, MinorityNodes, MessageFilters0),
-    State#state{message_filters=MessageFilters, majority_nodes=[], minority_nodes=[]};
+    PartitionFilters = delete_cluster_partition(MajorityNodes, MinorityNodes, PartitionFilters0),
+    State#state{partition_filters=PartitionFilters, majority_nodes=[], minority_nodes=[]};
 next_state(State, _Res, {call, ?MODULE, join_cluster, [Node, JoinedNodes]}) -> 
     case is_joined(Node, JoinedNodes) of
         true ->
@@ -401,7 +401,7 @@ induce_async_partition(SourceNode, DestinationNode0) ->
     %% Convert to real node name and not symbolic name.
     DestinationNode = name_to_nodename(DestinationNode0),
 
-    MessageFilterFun = fun({N, _}) ->
+    PartitionFilterFun = fun({forward_message, N, _}) ->
         case N of
             DestinationNode ->
                 lager:info("Dropping packet from ~p to ~p due to filter.", [SourceNode, DestinationNode]),
@@ -411,7 +411,7 @@ induce_async_partition(SourceNode, DestinationNode0) ->
                 true
         end
     end,
-    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_message_filter, [{async, DestinationNode}, MessageFilterFun]).
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_interposition_fun, [{async, DestinationNode}, PartitionFilterFun]).
 
 resolve_async_partition(SourceNode, DestinationNode0) ->
     debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode0]),
@@ -419,7 +419,7 @@ resolve_async_partition(SourceNode, DestinationNode0) ->
     %% Convert to real node name and not symbolic name.
     DestinationNode = name_to_nodename(DestinationNode0),
 
-    rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_message_filter, [{async, DestinationNode}]).
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_interposition_fun, [{async, DestinationNode}]).
 
 induce_sync_partition(SourceNode, DestinationNode) ->
     debug("induce_sync_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode]),
@@ -668,15 +668,15 @@ majority_nodes() ->
             ?LET(Sublist, lists:sublist(Names, trunc(MajorityCount)), Sublist))).
 
 %% Is a node involved in an sync partition?
-is_involved_in_partition(SourceNode, DestinationNode, MessageFilters) ->
-    Source = case dict:find({SourceNode, DestinationNode}, MessageFilters) of
+is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    Source = case dict:find({SourceNode, DestinationNode}, PartitionFilters) of
         error ->
             false;
         _ ->
             true
     end,
 
-    Destination = case dict:find({DestinationNode, SourceNode}, MessageFilters) of
+    Destination = case dict:find({DestinationNode, SourceNode}, PartitionFilters) of
         error ->
             false;
         _ ->
@@ -685,37 +685,37 @@ is_involved_in_partition(SourceNode, DestinationNode, MessageFilters) ->
 
     Source orelse Destination.
 
-delete_sync_partition(SourceNode, DestinationNode, MessageFilters) ->
+delete_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
     delete_async_partition(DestinationNode, SourceNode, 
-        delete_async_partition(SourceNode, DestinationNode, MessageFilters)).
+        delete_async_partition(SourceNode, DestinationNode, PartitionFilters)).
 
-delete_async_partition(SourceNode, DestinationNode, MessageFilters) ->
-    dict:erase({SourceNode, DestinationNode}, MessageFilters).
+delete_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    dict:erase({SourceNode, DestinationNode}, PartitionFilters).
 
-add_sync_partition(SourceNode, DestinationNode, MessageFilters) ->
+add_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
     add_async_partition(SourceNode, DestinationNode,
-        add_async_partition(DestinationNode, SourceNode, MessageFilters)).
+        add_async_partition(DestinationNode, SourceNode, PartitionFilters)).
 
-add_async_partition(SourceNode, DestinationNode, MessageFilters) ->
-    dict:store({SourceNode, DestinationNode}, true, MessageFilters).
+add_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    dict:store({SourceNode, DestinationNode}, true, PartitionFilters).
 
-add_cluster_partition(MajorityNodes, AllNodes, MessageFilters) ->
+add_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
     MinorityNodes = AllNodes -- MajorityNodes,
 
     lists:foldl(fun(SourceNode, Filters) ->
         lists:foldl(fun(DestinationNode, Filters2) ->
             add_sync_partition(SourceNode, DestinationNode, Filters2)
             end, Filters, MinorityNodes)
-        end, MessageFilters, MajorityNodes).
+        end, PartitionFilters, MajorityNodes).
 
-delete_cluster_partition(MajorityNodes, AllNodes, MessageFilters) ->
+delete_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
     MinorityNodes = AllNodes -- MajorityNodes,
 
     lists:foldl(fun(SourceNode, Filters) ->
         lists:foldl(fun(DestinationNode, Filters2) ->
             delete_sync_partition(SourceNode, DestinationNode, Filters2)
             end, Filters, MinorityNodes)
-        end, MessageFilters, MajorityNodes).
+        end, PartitionFilters, MajorityNodes).
 
 induce_cluster_partition(MajorityNodes, AllNodes) ->
     MinorityNodes = AllNodes -- MajorityNodes,
@@ -745,7 +745,7 @@ resolve_cluster_partition(MajorityNodes, AllNodes) ->
         end, MajorityNodes),
     all_to_ok_or_error(Results).
 
-is_involved_in_x_partitions(Node, X, MessageFilters) ->
+is_involved_in_x_partitions(Node, X, PartitionFilters) ->
     Count = dict:fold(fun(Key, _Value, AccIn) ->
             case Key of
                 {Node, _} ->
@@ -753,7 +753,7 @@ is_involved_in_x_partitions(Node, X, MessageFilters) ->
                 _ ->
                     AccIn
             end
-        end, 0, MessageFilters),
+        end, 0, PartitionFilters),
     debug("is_involved_in_x_partitions is ~p and should be ~p", [Count, X]),
     Count >= X.
 
