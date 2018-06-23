@@ -65,3 +65,12 @@
              {set,{var,2},
                   {call,prop_unir,induce_byzantine_fault,[node_1,<<"key">>]}},
              {set,{var,3},{call,prop_unir,read_object,[node_2,<<"key">>]}}]]}.
+
+{prop_unir,prop_sequential,
+           [[{set,{var,1},
+                  {call,prop_unir,write_object,
+                        [node_1,<<"key">>,{{1529,728744,503235},<<"`e">>}]}},
+             {set,{var,2},
+                  {call,prop_unir,induce_byzantine_bit_flip_fault,
+                        [node_3,<<"key">>,<<"î">>]}},
+             {set,{var,3},{call,prop_unir,read_object,[node_1,<<"key">>]}}]]}.
