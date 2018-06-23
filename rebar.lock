@@ -50,7 +50,7 @@
   1},
  {<<"partisan">>,
   {git,"git://github.com/lasp-lang/partisan",
-       {ref,"2f7cf3a0f890213102706b3e0dbe0c2a384de9e6"}},
+       {ref,"47c7c8e37347c9b8f7ad34a07eef950d3fe981e4"}},
   0},
  {<<"pbkdf2">>,
   {git,"git://github.com/marianoguerra/erlang-pbkdf2-no-history",
