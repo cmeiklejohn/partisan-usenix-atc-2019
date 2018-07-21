@@ -109,10 +109,12 @@ execute(timeout, #state{preflist=Preflist,
                         key=Key,
                         value=Value,
                         coordinator=Coordinator}=State) ->
+    lager:info("** sending requests to preflist: ~p", [Preflist]),
     unir_vnode:put(Preflist, {ReqId, Coordinator}, Key, Value),
     {next_state, waiting, State}.
 
 waiting({ok, ReqId, Value}, #state{responses=Responses0, from=From}=State0) ->
+    lager:info("** got response with value ~p", [Value]),
     Responses = Responses0 + 1,
     State = State0#state{responses=Responses},
     case Responses =:= ?W of

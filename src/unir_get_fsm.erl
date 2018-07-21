@@ -97,6 +97,8 @@ init([ReqId, From, Key]) ->
     {ok, prepare, State, 0}.
 
 prepare(timeout, #state{key=Key}=State) ->
+    lager:info("** get fsm started..."),
+
     DocIdx = riak_core_util:chash_key({<<"objects">>, term_to_binary(Key)}),
     Preflist = riak_core_apl:get_primary_apl(DocIdx, ?N, unir),
     Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
@@ -110,6 +112,8 @@ execute(timeout, #state{preflist=Preflist,
     {next_state, waiting, State}.
 
 waiting({ok, ReqId, Value}, #state{responses=Responses0, from=From}=State0) ->
+    lager:info("** got response number ~p: ~p", [length(Responses0) + 1, Value]),
+
     Responses = [Value|Responses0],
     State = State0#state{responses=Responses},
     case length(Responses) =:= ?W of
