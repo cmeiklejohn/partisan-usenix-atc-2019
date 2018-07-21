@@ -17,13 +17,11 @@
 -define(COMMAND_MULTIPLE, 10).
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
--define(PERFORM_LEAVES_AND_JOINS, false).
+-define(DEBUG, true).
 
-%% Only one of the modes below should be selected for proper shriking.
--define(PERFORM_CLUSTER_PARTITIONS, false).
--define(PERFORM_ASYNC_PARTITIONS, false).
--define(PERFORM_SYNC_PARTITIONS, true).
--define(PERFORM_BYZANTINE_FAULTS, true).
+%% TODO: Latency injection, egress/ingress.
+%% TODO: Fix message corruption fault.
+%% TODO: Add behavior for the vnode module.
 
 %% Partisan connection and forwarding settings.
 -define(VNODE_PARTITIONING, false).
@@ -31,8 +29,22 @@
 -define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
 -define(CAUSAL_LABELS, []).
 
+%% Only one of the modes below should be selected for proper shriking.
+-define(PERFORM_LEAVES_AND_JOINS, false).           %% Do we allow cluster transitions during test execution:
+                                                    %% EXTREMELY slow, given a single join can take ~30 seconds.
+-define(PERFORM_CLUSTER_PARTITIONS, false).         %% Whether or not we should partition at the cluster level 
+                                                    %% ie. groups of nodes at a time.
+-define(PERFORM_ASYNC_PARTITIONS, false).           %% Whether or not we should partition using asymmetric partitions
+                                                    %% ie. nodes can send but not receive from other nodes
+-define(PERFORM_SYNC_PARTITIONS, true).             %% Whether or not we should use symmetric partitions: most common.
+                                                    %% ie. two-way communication prohibited between different nodes.
+-define(PERFORM_BYZANTINE_MESSAGE_FAULTS, false).   %% Whether or not we should use cluster byzantine faults:
+                                                    %% ie. message corruption, etc.
+-define(PERFORM_BYZANTINE_NODE_FAULTS, true).       %% Whether or not we should use cluster-specific byzantine faults.
+                                                    %% ie. data loss bugs, bit flips, etc.
+
 %% Other options to exercise pathological cases.
--define(BIAS_MINORITY, false).
+-define(BIAS_MINORITY, false).                      %% Bias requests to minority partitions.
 
 -export([command/1, 
          initial_state/0, 
@@ -62,7 +74,7 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, node_state, partition_filters, minority_nodes, majority_nodes}).
+-record(state, {joined_nodes, nodes, node_state, partition_filters, minority_nodes, majority_nodes, byzantine_faults}).
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -80,8 +92,9 @@ initial_state() ->
             Nodes
     end,
 
-    %% Message filters.
+    %% Fault state management.
     PartitionFilters = dict:new(),
+    ByzantineFaults = dict:new(),
     MinorityNodes = [],
     MajorityNodes = [],
 
@@ -93,12 +106,17 @@ initial_state() ->
            minority_nodes=MinorityNodes,
            majority_nodes=MajorityNodes, 
            node_state=NodeState, 
+           byzantine_faults=ByzantineFaults,
            partition_filters=PartitionFilters}.
 
 command(State) -> 
     ?LET(Commands, cluster_commands(State) ++ node_commands(), oneof(Commands)).
 
 %% Picks whether a command should be valid under the current state.
+precondition(#state{byzantine_faults=ByzantineFaults}, {call, _Mod, induce_byzantine_message_corruption_fault, [SourceNode, DestinationNode, _Value]}) -> 
+    not is_involved_in_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults);
+precondition(#state{byzantine_faults=ByzantineFaults}, {call, _Mod, resolve_byzantine_message_corruption_fault, [SourceNode, DestinationNode]}) -> 
+    is_involved_in_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults);
 precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, induce_async_partition, [SourceNode, DestinationNode]}) -> 
     not is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters);
 precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, resolve_async_partition, [SourceNode, DestinationNode]}) -> 
@@ -125,48 +143,48 @@ precondition(#state{partition_filters=PartitionFilters}, {call, _Mod, resolve_cl
     end, MajorityNodes);
 precondition(#state{nodes=Nodes, joined_nodes=JoinedNodes}, {call, _Mod, join_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the first unjoined node in the nodes list, for ease of debugging.
-    %% debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
+    debug("precondition join_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
 
     ToBeJoinedNodes = Nodes -- JoinedNodes,
-    %% debug("precondition join_cluster: remaining nodes to be joined are: ~p", [ToBeJoinedNodes]),
+    debug("precondition join_cluster: remaining nodes to be joined are: ~p", [ToBeJoinedNodes]),
 
     case length(ToBeJoinedNodes) > 0 of
         true ->
             ToBeJoinedNode = hd(ToBeJoinedNodes),
-            %% debug("precondition join_cluster: attempting to join ~p", [ToBeJoinedNode]),
+            debug("precondition join_cluster: attempting to join ~p", [ToBeJoinedNode]),
             case ToBeJoinedNode of
                 Node ->
-                    %% debug("precondition join_cluster: YES attempting to join ~p is ~p", [ToBeJoinedNode, Node]),
+                    debug("precondition join_cluster: YES attempting to join ~p is ~p", [ToBeJoinedNode, Node]),
                     true;
-                _OtherNode ->
-                    %% debug("precondition join_cluster: NO attempting to join ~p not ~p", [ToBeJoinedNode, OtherNode]),
+                OtherNode ->
+                    debug("precondition join_cluster: NO attempting to join ~p not ~p", [ToBeJoinedNode, OtherNode]),
                     false
             end;
         false ->
-            %% debug("precondition join_cluster: no nodes left to join.", []),
+            debug("precondition join_cluster: no nodes left to join.", []),
             false %% Might need to be changed when there's no read/write operations.
     end;
 precondition(#state{joined_nodes=JoinedNodes}, {call, _Mod, leave_cluster, [Node, JoinedNodes]}) -> 
     %% Only allow dropping of the last node in the join list, for ease of debugging.
-    %% debug("precondition leave_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
+    debug("precondition leave_cluster: invoked for node ~p joined_nodes ~p", [Node, JoinedNodes]),
 
     ToBeRemovedNodes = JoinedNodes,
-    %% debug("precondition leave_cluster: remaining nodes to be removed are: ~p", [ToBeRemovedNodes]),
+    debug("precondition leave_cluster: remaining nodes to be removed are: ~p", [ToBeRemovedNodes]),
 
     case length(ToBeRemovedNodes) > 3 of
         true ->
             ToBeRemovedNode = lists:last(ToBeRemovedNodes),
-            %% debug("precondition leave_cluster: attempting to leave ~p", [ToBeRemovedNode]),
+            debug("precondition leave_cluster: attempting to leave ~p", [ToBeRemovedNode]),
             case ToBeRemovedNode of
                 Node ->
-                    %% debug("precondition leave_cluster: YES attempting to leave ~p is ~p", [ToBeRemovedNode, Node]),
+                    debug("precondition leave_cluster: YES attempting to leave ~p is ~p", [ToBeRemovedNode, Node]),
                     true;
-                _OtherNode ->
-                    %% debug("precondition leave_cluster: NO attempting to leave ~p not ~p", [ToBeRemovedNode, OtherNode]),
+                OtherNode ->
+                    debug("precondition leave_cluster: NO attempting to leave ~p not ~p", [ToBeRemovedNode, OtherNode]),
                     false
             end;
         false ->
-            %% debug("precondition leave_cluster: no nodes left to remove.", []),
+            debug("precondition leave_cluster: no nodes left to remove.", []),
             false %% Might need to be changed when there's no read/write operations.
     end;
 precondition(#state{majority_nodes=MajorityNodes, minority_nodes=MinorityNodes, node_state=NodeState, joined_nodes=JoinedNodes}, {call, Mod, Fun, [Node|_]=Args}=Call) -> 
@@ -178,7 +196,7 @@ precondition(#state{majority_nodes=MajorityNodes, minority_nodes=MinorityNodes, 
                     debug("precondition fired for node function where minority is biased: ~p, bias_minority: ~p, checking whether node ~p is in minority", [Fun, ?BIAS_MINORITY, Node]),
                     case lists:member(Node, MinorityNodes) of
                         true ->
-                            %% debug("=> bias towards minority, write is going to node ~p in minority", [Node]),
+                            debug("=> bias towards minority, write is going to node ~p in minority", [Node]),
                             ClusterCondition = enough_nodes_connected(JoinedNodes) andalso is_joined(Node, JoinedNodes),
                             NodePrecondition = node_precondition(NodeState, Call),
                             ClusterCondition andalso NodePrecondition;
@@ -198,6 +216,14 @@ precondition(#state{majority_nodes=MajorityNodes, minority_nodes=MinorityNodes, 
 %% Given the state `State' *prior* to the call `{call, Mod, Fun, Args}',
 %% determine whether the result `Res' (coming from the actual system)
 %% makes sense.
+postcondition(_State, {call, ?MODULE, induce_byzantine_message_corruption_fault, [_SourceNode, _DestinationNode, _Value]}, ok) ->
+    debug("postcondition induce_byzantine_message_corruption_fault: succeeded", []),
+    %% Added message filter.
+    true;
+postcondition(_State, {call, ?MODULE, resolve_byzantine_message_corruption_fault, [_SourceNode, _DestinationNode]}, ok) ->
+    debug("postcondition resolve_byzantine_message_corruption_fault: succeeded", []),
+    %% Remove message filter.
+    true;
 postcondition(_State, {call, ?MODULE, induce_async_partition, [_SourceNode, _DestinationNode]}, ok) ->
     debug("postcondition induce_async_partition: succeeded", []),
     %% Added message filter.
@@ -268,6 +294,12 @@ postcondition(#state{minority_nodes=MinorityNodes, partition_filters=PartitionFi
 
 %% Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
+next_state(#state{byzantine_faults=ByzantineFaults0}=State, _Res, {call, ?MODULE, induce_byzantine_message_corruption_fault, [SourceNode, DestinationNode, Value]}) -> 
+    ByzantineFaults = add_byzantine_fault(SourceNode, DestinationNode, Value, ByzantineFaults0),
+    State#state{byzantine_faults=ByzantineFaults};
+next_state(#state{byzantine_faults=ByzantineFaults0}=State, _Res, {call, ?MODULE, resolve_byzantine_message_corruption_fault, [SourceNode, DestinationNode]}) -> 
+    ByzantineFaults = delete_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults0),
+    State#state{byzantine_faults=ByzantineFaults};
 next_state(#state{partition_filters=PartitionFilters0}=State, _Res, {call, ?MODULE, induce_async_partition, [SourceNode, DestinationNode]}) -> 
     PartitionFilters = add_async_partition(SourceNode, DestinationNode, PartitionFilters0),
     State#state{partition_filters=PartitionFilters};
@@ -395,23 +427,49 @@ read_object(Node, Key) ->
     debug("read_object: node ~p key ~p", [Node, Key]),
     rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
 
+induce_byzantine_message_corruption_fault(SourceNode, DestinationNode0, Value) ->
+    debug("induce_byzantine_message_corruption_fault: source_node ~p destination_node ~p value ~p", [SourceNode, DestinationNode0, Value]),
+
+    %% Convert to real node name and not symbolic name.
+    DestinationNode = name_to_nodename(DestinationNode0),
+
+    InterpositionFun = fun({forward_message, N, Message}) ->
+        case N of
+            DestinationNode ->
+                lager:info("Rewriting packet from ~p to ~p for message from ~p to ~p due to interposition.", [Message, Value, SourceNode, DestinationNode]),
+                Value;
+            OtherNode ->
+                lager:info("Allowing message, doesn't match interposition as destination is ~p and not ~p", [OtherNode, DestinationNode]),
+                Message
+        end
+    end,
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_interposition_fun, [{corruption, DestinationNode}, InterpositionFun]).
+
+resolve_byzantine_message_corruption_fault(SourceNode, DestinationNode0) ->
+    debug("resolve_byzantine_message_corruption_fault: source_node ~p destination_node ~p", [SourceNode, DestinationNode0]),
+
+    %% Convert to real node name and not symbolic name.
+    DestinationNode = name_to_nodename(DestinationNode0),
+
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, remove_interposition_fun, [{corruption, DestinationNode}]).
+
 induce_async_partition(SourceNode, DestinationNode0) ->
     debug("induce_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode0]),
 
     %% Convert to real node name and not symbolic name.
     DestinationNode = name_to_nodename(DestinationNode0),
 
-    PartitionFilterFun = fun({forward_message, N, _}) ->
+    InterpositionFun = fun({forward_message, N, Message}) ->
         case N of
             DestinationNode ->
-                lager:info("Dropping packet from ~p to ~p due to filter.", [SourceNode, DestinationNode]),
-                false;
+                lager:info("Dropping packet from ~p to ~p due to interposition.", [SourceNode, DestinationNode]),
+                undefined;
             OtherNode ->
-                lager:info("Allowing message, doesn't match filter as destination is ~p and not ~p", [OtherNode, DestinationNode]),
-                true
+                lager:info("Allowing message, doesn't match interposition as destination is ~p and not ~p", [OtherNode, DestinationNode]),
+                Message
         end
     end,
-    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_interposition_fun, [{async, DestinationNode}, PartitionFilterFun]).
+    rpc:call(name_to_nodename(SourceNode), ?MANAGER, add_interposition_fun, [{async, DestinationNode}, InterpositionFun]).
 
 resolve_async_partition(SourceNode, DestinationNode0) ->
     debug("resolve_async_partition: source_node ~p destination_node ~p", [SourceNode, DestinationNode0]),
@@ -502,12 +560,27 @@ enough_nodes_connected_to_issue_remove(Nodes) ->
     length(Nodes) > 3.
 
 debug(Line, Args) ->
-    lager:info(Line, Args).
+    case ?DEBUG of
+        true ->
+            lager:info(Line, Args);
+        false ->
+            ok
+    end.
 
 is_joined(Node, Cluster) ->
     lists:member(Node, Cluster).
 
 cluster_commands(#state{joined_nodes=JoinedNodes}) ->
+    ByzantineCommands = case ?PERFORM_BYZANTINE_MESSAGE_FAULTS of
+        true ->
+            [
+            {call, ?MODULE, induce_byzantine_message_corruption_fault, [node_name(), node_name(), value()]},
+            {call, ?MODULE, resolve_byzantine_message_corruption_fault, [node_name(), node_name()]}
+            ];
+        false ->
+            []
+    end,
+
     MemberCommands = case ?PERFORM_LEAVES_AND_JOINS of
         true ->
             [
@@ -551,7 +624,8 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     MemberCommands ++ 
         AsyncPartitionCommands ++ 
         SyncPartitionCommands ++ 
-        ClusterPartitionCommands.
+        ClusterPartitionCommands ++
+        ByzantineCommands.
 
 %%%===================================================================
 %%% Node Functions
@@ -559,7 +633,7 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
 
 %% What node-specific operations should be called.
 node_commands() ->
-    ByzantineCommands = case ?PERFORM_BYZANTINE_FAULTS of
+    ByzantineCommands = case ?PERFORM_BYZANTINE_NODE_FAULTS of
         true ->
             [
             {call, ?MODULE, induce_byzantine_disk_loss_fault, [node_name(), key()]},
@@ -609,6 +683,10 @@ node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_
                     false
             end
     end;
+node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
+    debug("read_object ~p ~p timeout", [Node, Key]),
+    %% Consider timeouts as failures for now.
+    false;
 node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_bit_flip_fault, [Node, Key, Value]}, ok) -> 
     debug("induce_byzantine_bit_flip_fault: ~p ~p ~p", [Node, Key, Value]),
     true;
@@ -667,6 +745,24 @@ majority_nodes() ->
         ?LET(Names, names(), 
             ?LET(Sublist, lists:sublist(Names, trunc(MajorityCount)), Sublist))).
 
+%% Is a node involved in a byzantine fault?
+is_involved_in_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults) ->
+    Source = case dict:find({SourceNode, DestinationNode}, ByzantineFaults) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Destination = case dict:find({DestinationNode, SourceNode}, ByzantineFaults) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Source orelse Destination.
+
 %% Is a node involved in an sync partition?
 is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters) ->
     Source = case dict:find({SourceNode, DestinationNode}, PartitionFilters) of
@@ -698,6 +794,12 @@ add_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
 
 add_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
     dict:store({SourceNode, DestinationNode}, true, PartitionFilters).
+
+add_byzantine_fault(SourceNode, DestinationNode, Value, ByzantineFaults) ->
+    dict:store({SourceNode, DestinationNode}, Value, ByzantineFaults).
+
+delete_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults) ->
+    dict:erase({SourceNode, DestinationNode}, ByzantineFaults).
 
 add_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
     MinorityNodes = AllNodes -- MajorityNodes,
@@ -782,7 +884,7 @@ is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
     end.
 
 induce_byzantine_disk_loss_fault(Node, Key) ->
-    rpc:call(name_to_nodename(Node), unir, nuke, [Key]).
+    rpc:call(name_to_nodename(Node), unir, inject_failure, [Key, undefined]).
 
 induce_byzantine_bit_flip_fault(Node, Key, Value) ->
-    rpc:call(name_to_nodename(Node), unir, alter, [Key, Value]).
+    rpc:call(name_to_nodename(Node), unir, inject_failure, [Key, Value]).

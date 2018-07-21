@@ -2,14 +2,15 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(riak_core_vnode).
+-behaviour(testable_vnode).
 
 -export([start_vnode/1,
          init/1,
          ping/2,
          put/4,
-         get/3,
-         nuke/3,
-         alter/4]).
+         get/3]).
+
+-export([inject_failure/4]).
 
 -export([terminate/2,
          handle_command/3,
@@ -52,15 +53,10 @@ get(Preflist, Identity, Key) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-nuke(Preflist, Identity, Key) ->
+inject_failure(Preflist, Identity, Key, Value) ->
+    lager:info("*** failure injection is about to call vnode"),
     riak_core_vnode_master:command(Preflist,
-                                   {nuke, Identity, Key},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-alter(Preflist, Identity, Key, Value) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {alter, Identity, Key, Value},
+                                   {inject_failure, Identity, Key, Value},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -76,15 +72,17 @@ handle_command({put, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=Stat
     timer:sleep(10),
     Store = dict:store(Key, Value, Store0),
     {reply, {ok, ReqId, Value}, State#state{store=Store}};
-handle_command({nuke, {ReqId, _}, Key}, _Sender, #state{store=Store0}=State) ->
-    Store = dict:erase(Key, Store0),
-    {reply, {ok, ReqId}, State#state{store=Store}};
-handle_command({alter, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
-    Store = case dict:find(Key, Store0) of
-        {ok, _} ->
-            dict:store(Key, Value, Store0);
-        error ->
-            Store0
+handle_command({inject_failure, {ReqId, _}, Key, Value}, _Sender, #state{store=Store0}=State) ->
+    Store = case Value of
+        undefined ->
+            dict:erase(Key, Store0);
+        Value ->
+            case dict:find(Key, Store0) of
+                {ok, _} ->
+                    dict:store(Key, Value, Store0);
+                error ->
+                    Store0
+            end
     end,
     {reply, {ok, ReqId}, State#state{store=Store}};
 handle_command({get, {ReqId, _}, Key}, _Sender, #state{store=Store}=State) ->

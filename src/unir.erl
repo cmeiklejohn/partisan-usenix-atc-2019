@@ -11,10 +11,9 @@
          fsm_get/1,
          fsm_put/2,
          echo/0,
-         echo/1,
-         nuke/1,
-         alter/2
-        ]).
+         echo/1]).
+
+-export([inject_failure/2]).
 
 -ignore_xref([
               ping/0,
@@ -82,14 +81,9 @@ fsm_get(Key) ->
     {ok, ReqId} = unir_get_fsm:get(Key),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
-%% @doc Nuke state.
-nuke(Key) ->
-    {ok, ReqId} = unir_nuke_fsm:nuke(Key),
-    wait_for_reqid(ReqId, ?TIMEOUT).
-
 %% @doc Alter state.
-alter(Key, Value) ->
-    {ok, ReqId} = unir_alter_fsm:alter(Key, Value),
+inject_failure(Key, Value) ->
+    {ok, ReqId} = unir_failure_fsm:inject_failure(Key, Value),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %%%===================================================================
