@@ -36,12 +36,8 @@ init(_Args) ->
               {unir_get_fsm_sup, start_link, []},
                permanent, infinity, supervisor, [unir_get_fsm_sup]},
 
-    NukeFSM = {unir_nuke_fsm_sup,
-               {unir_nuke_fsm_sup, start_link, []},
-                permanent, infinity, supervisor, [unir_nuke_fsm_sup]},
+    FailureFSM = {unir_failure_fsm_sup,
+                  {unir_failure_fsm_sup, start_link, []},
+                   permanent, infinity, supervisor, [unir_failure_fsm_sup]},
 
-    AlterFSM = {unir_alter_fsm_sup,
-                {unir_alter_fsm_sup, start_link, []},
-                 permanent, infinity, supervisor, [unir_alter_fsm_sup]},
-
-    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM, PutFSM, GetFSM, NukeFSM, AlterFSM]}}.
+    {ok, {{one_for_one, 5, 10}, [VMaster, PingFSM, PutFSM, GetFSM, FailureFSM]}}.
