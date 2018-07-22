@@ -20,19 +20,20 @@
 -define(DEBUG, true).
 
 %% Application under test.
--define(APP, unir).
+-define(APP, unir).                                 %% The name of the top-level application that requests
+                                                    %% should be issued to using the RPC mechanism.
 
-%% TODO: Latency injection, egress/ingress.
 %% TODO: Fix message corruption fault.
 %% TODO: Fix bit flip bugs.
 
 %% Partisan connection and forwarding settings.
--define(EGRESS_DELAY, 0).
--define(INGRESS_DELAY, 0).
--define(VNODE_PARTITIONING, false).
--define(PARALLELISM, 1).
--define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
--define(CAUSAL_LABELS, []).
+-define(EGRESS_DELAY, 0).                           %% How many milliseconds to delay outgoing messages?
+-define(INGRESS_DELAY, 0).                          %% How many milliseconds to delay incoming messages?
+-define(VNODE_PARTITIONING, false).                 %% Should communication be partitioned by vnode identifier?
+-define(PARALLELISM, 1).                            %% How many connections should exist between nodes?
+-define(CHANNELS, 
+        [broadcast, vnode, {monotonic, gossip}]).   %% What channels should be established?
+-define(CAUSAL_LABELS, []).                         %% What causal channels should be established?
 
 %% Only one of the modes below should be selected for efficient, proper shriking.
 -define(PERFORM_LEAVES_AND_JOINS, false).           %% Do we allow cluster transitions during test execution:
@@ -80,7 +81,19 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
--record(state, {joined_nodes, nodes, node_state, partition_filters, minority_nodes, majority_nodes, byzantine_faults}).
+-record(state, {
+                joined_nodes :: [node()],
+                nodes :: [node()],
+                node_state :: {dict:dict(), dict:dict()}, 
+                partition_filters :: dict:dict(),
+                minority_nodes :: [node()], 
+                majority_nodes :: [node()], 
+                byzantine_faults :: dict:dict()
+            }).
+
+%%%===================================================================
+%%% Generators
+%%%===================================================================
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -375,7 +388,7 @@ value() ->
         {erlang:timestamp(), Binary}).
 
 %%%===================================================================
-%%% Helper Functions
+%%% Cluster Functions
 %%%===================================================================
 
 start_nodes() ->
@@ -427,13 +440,137 @@ stop_nodes() ->
 
     ok.
 
-write_object(Node, Key, Value) ->
-    debug("write_object: node ~p key ~p value ~p", [Node, Key, Value]),
-    rpc:call(name_to_nodename(Node), ?APP, fsm_put, [Key, Value]).
+%% Determine if a bunch of operations succeeded or failed.
+all_to_ok_or_error(List) ->
+    case lists:all(fun(X) -> X =:= ok end, List) of
+        true ->
+            ok;
+        false ->
+            {error, some_opertions_failed}
+    end.
 
-read_object(Node, Key) ->
-    debug("read_object: node ~p key ~p", [Node, Key]),
-    rpc:call(name_to_nodename(Node), ?APP, fsm_get, [Key]).
+%% Select a random grouping of nodes.
+majority_nodes() ->
+    ?LET(MajorityCount, ?NUM_NODES / 2 + 1,
+        ?LET(Names, names(), 
+            ?LET(Sublist, lists:sublist(Names, trunc(MajorityCount)), Sublist))).
+
+%% Is a node involved in a byzantine fault?
+is_involved_in_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults) ->
+    Source = case dict:find({SourceNode, DestinationNode}, ByzantineFaults) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Destination = case dict:find({DestinationNode, SourceNode}, ByzantineFaults) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Source orelse Destination.
+
+%% Is a node involved in an sync partition?
+is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    Source = case dict:find({SourceNode, DestinationNode}, PartitionFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Destination = case dict:find({DestinationNode, SourceNode}, PartitionFilters) of
+        error ->
+            false;
+        _ ->
+            true
+    end,
+
+    Source orelse Destination.
+
+delete_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    delete_async_partition(DestinationNode, SourceNode, 
+        delete_async_partition(SourceNode, DestinationNode, PartitionFilters)).
+
+delete_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    dict:erase({SourceNode, DestinationNode}, PartitionFilters).
+
+add_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    add_async_partition(SourceNode, DestinationNode,
+        add_async_partition(DestinationNode, SourceNode, PartitionFilters)).
+
+add_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
+    dict:store({SourceNode, DestinationNode}, true, PartitionFilters).
+
+add_byzantine_fault(SourceNode, DestinationNode, Value, ByzantineFaults) ->
+    dict:store({SourceNode, DestinationNode}, Value, ByzantineFaults).
+
+delete_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults) ->
+    dict:erase({SourceNode, DestinationNode}, ByzantineFaults).
+
+add_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+
+    lists:foldl(fun(SourceNode, Filters) ->
+        lists:foldl(fun(DestinationNode, Filters2) ->
+            add_sync_partition(SourceNode, DestinationNode, Filters2)
+            end, Filters, MinorityNodes)
+        end, PartitionFilters, MajorityNodes).
+
+delete_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+
+    lists:foldl(fun(SourceNode, Filters) ->
+        lists:foldl(fun(DestinationNode, Filters2) ->
+            delete_sync_partition(SourceNode, DestinationNode, Filters2)
+            end, Filters, MinorityNodes)
+        end, PartitionFilters, MajorityNodes).
+
+induce_cluster_partition(MajorityNodes, AllNodes) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+    debug("induce_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
+
+    Results = lists:flatmap(fun(SourceNode) ->
+        lists:flatmap(fun(DestinationNode) ->
+            [
+             induce_async_partition(SourceNode, DestinationNode),
+             induce_async_partition(DestinationNode, SourceNode)
+            ]
+            end, MinorityNodes)
+        end, MajorityNodes),
+    all_to_ok_or_error(Results).
+
+resolve_cluster_partition(MajorityNodes, AllNodes) ->
+    MinorityNodes = AllNodes -- MajorityNodes,
+
+    debug("resolve_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
+    Results = lists:flatmap(fun(SourceNode) ->
+        lists:flatmap(fun(DestinationNode) ->
+            [
+             resolve_async_partition(SourceNode, DestinationNode),
+             resolve_async_partition(DestinationNode, SourceNode)
+            ]
+            end, MinorityNodes)
+        end, MajorityNodes),
+    all_to_ok_or_error(Results).
+
+is_involved_in_x_partitions(Node, X, PartitionFilters) ->
+    Count = dict:fold(fun(Key, _Value, AccIn) ->
+            case Key of
+                {Node, _} ->
+                    AccIn + 1;
+                _ ->
+                    AccIn
+            end
+        end, 0, PartitionFilters),
+    debug("is_involved_in_x_partitions is ~p and should be ~p", [Count, X]),
+    Count >= X.
+
+is_valid_partition(SourceNode, DestinationNode) ->
+    SourceNode =/= DestinationNode.
 
 induce_byzantine_message_corruption_fault(SourceNode, DestinationNode0, Value) ->
     debug("induce_byzantine_message_corruption_fault: source_node ~p destination_node ~p value ~p", [SourceNode, DestinationNode0, Value]),
@@ -754,138 +891,6 @@ node_next_state({DatabaseState0, ClientState0}, _Res, {call, ?MODULE, write_obje
     ClientState = dict:store(Key, Value, ClientState0),
     {DatabaseState, ClientState}.
 
-%% Determine if a bunch of operations succeeded or failed.
-all_to_ok_or_error(List) ->
-    case lists:all(fun(X) -> X =:= ok end, List) of
-        true ->
-            ok;
-        false ->
-            {error, some_opertions_failed}
-    end.
-
-%% Select a random grouping of nodes.
-majority_nodes() ->
-    ?LET(MajorityCount, ?NUM_NODES / 2 + 1,
-        ?LET(Names, names(), 
-            ?LET(Sublist, lists:sublist(Names, trunc(MajorityCount)), Sublist))).
-
-%% Is a node involved in a byzantine fault?
-is_involved_in_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults) ->
-    Source = case dict:find({SourceNode, DestinationNode}, ByzantineFaults) of
-        error ->
-            false;
-        _ ->
-            true
-    end,
-
-    Destination = case dict:find({DestinationNode, SourceNode}, ByzantineFaults) of
-        error ->
-            false;
-        _ ->
-            true
-    end,
-
-    Source orelse Destination.
-
-%% Is a node involved in an sync partition?
-is_involved_in_partition(SourceNode, DestinationNode, PartitionFilters) ->
-    Source = case dict:find({SourceNode, DestinationNode}, PartitionFilters) of
-        error ->
-            false;
-        _ ->
-            true
-    end,
-
-    Destination = case dict:find({DestinationNode, SourceNode}, PartitionFilters) of
-        error ->
-            false;
-        _ ->
-            true
-    end,
-
-    Source orelse Destination.
-
-delete_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
-    delete_async_partition(DestinationNode, SourceNode, 
-        delete_async_partition(SourceNode, DestinationNode, PartitionFilters)).
-
-delete_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
-    dict:erase({SourceNode, DestinationNode}, PartitionFilters).
-
-add_sync_partition(SourceNode, DestinationNode, PartitionFilters) ->
-    add_async_partition(SourceNode, DestinationNode,
-        add_async_partition(DestinationNode, SourceNode, PartitionFilters)).
-
-add_async_partition(SourceNode, DestinationNode, PartitionFilters) ->
-    dict:store({SourceNode, DestinationNode}, true, PartitionFilters).
-
-add_byzantine_fault(SourceNode, DestinationNode, Value, ByzantineFaults) ->
-    dict:store({SourceNode, DestinationNode}, Value, ByzantineFaults).
-
-delete_byzantine_fault(SourceNode, DestinationNode, ByzantineFaults) ->
-    dict:erase({SourceNode, DestinationNode}, ByzantineFaults).
-
-add_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
-    MinorityNodes = AllNodes -- MajorityNodes,
-
-    lists:foldl(fun(SourceNode, Filters) ->
-        lists:foldl(fun(DestinationNode, Filters2) ->
-            add_sync_partition(SourceNode, DestinationNode, Filters2)
-            end, Filters, MinorityNodes)
-        end, PartitionFilters, MajorityNodes).
-
-delete_cluster_partition(MajorityNodes, AllNodes, PartitionFilters) ->
-    MinorityNodes = AllNodes -- MajorityNodes,
-
-    lists:foldl(fun(SourceNode, Filters) ->
-        lists:foldl(fun(DestinationNode, Filters2) ->
-            delete_sync_partition(SourceNode, DestinationNode, Filters2)
-            end, Filters, MinorityNodes)
-        end, PartitionFilters, MajorityNodes).
-
-induce_cluster_partition(MajorityNodes, AllNodes) ->
-    MinorityNodes = AllNodes -- MajorityNodes,
-    debug("induce_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
-
-    Results = lists:flatmap(fun(SourceNode) ->
-        lists:flatmap(fun(DestinationNode) ->
-            [
-             induce_async_partition(SourceNode, DestinationNode),
-             induce_async_partition(DestinationNode, SourceNode)
-            ]
-            end, MinorityNodes)
-        end, MajorityNodes),
-    all_to_ok_or_error(Results).
-
-resolve_cluster_partition(MajorityNodes, AllNodes) ->
-    MinorityNodes = AllNodes -- MajorityNodes,
-
-    debug("resolve_cluster_partition: majority_nodes ~p minority_nodes ~p", [MajorityNodes, MinorityNodes]),
-    Results = lists:flatmap(fun(SourceNode) ->
-        lists:flatmap(fun(DestinationNode) ->
-            [
-             resolve_async_partition(SourceNode, DestinationNode),
-             resolve_async_partition(DestinationNode, SourceNode)
-            ]
-            end, MinorityNodes)
-        end, MajorityNodes),
-    all_to_ok_or_error(Results).
-
-is_involved_in_x_partitions(Node, X, PartitionFilters) ->
-    Count = dict:fold(fun(Key, _Value, AccIn) ->
-            case Key of
-                {Node, _} ->
-                    AccIn + 1;
-                _ ->
-                    AccIn
-            end
-        end, 0, PartitionFilters),
-    debug("is_involved_in_x_partitions is ~p and should be ~p", [Count, X]),
-    Count >= X.
-
-is_valid_partition(SourceNode, DestinationNode) ->
-    SourceNode =/= DestinationNode.
-
 is_monotonic_read(Key, not_found, ClientState) ->
     case dict:find(Key, ClientState) of
         {ok, {_LastReadTimestamp, _LastReadBinary} = LastReadValue} ->
@@ -912,3 +917,11 @@ induce_byzantine_disk_loss_fault(Node, Key) ->
 
 induce_byzantine_bit_flip_fault(Node, Key, Value) ->
     rpc:call(name_to_nodename(Node), ?APP, inject_failure, [Key, Value]).
+
+write_object(Node, Key, Value) ->
+    debug("write_object: node ~p key ~p value ~p", [Node, Key, Value]),
+    rpc:call(name_to_nodename(Node), ?APP, fsm_put, [Key, Value]).
+
+read_object(Node, Key) ->
+    debug("read_object: node ~p key ~p", [Node, Key]),
+    rpc:call(name_to_nodename(Node), ?APP, fsm_get, [Key]).
