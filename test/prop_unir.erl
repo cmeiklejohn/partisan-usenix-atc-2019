@@ -19,9 +19,12 @@
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(DEBUG, true).
 
+%% Application under test.
+-define(APP, unir).
+
 %% TODO: Latency injection, egress/ingress.
 %% TODO: Fix message corruption fault.
-%% TODO: Add behavior for the vnode module.
+%% TODO: Fix bit flip bugs.
 
 %% Partisan connection and forwarding settings.
 -define(VNODE_PARTITIONING, false).
@@ -29,7 +32,7 @@
 -define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
 -define(CAUSAL_LABELS, []).
 
-%% Only one of the modes below should be selected for proper shriking.
+%% Only one of the modes below should be selected for efficient, proper shriking.
 -define(PERFORM_LEAVES_AND_JOINS, false).           %% Do we allow cluster transitions during test execution:
                                                     %% EXTREMELY slow, given a single join can take ~30 seconds.
 -define(PERFORM_CLUSTER_PARTITIONS, false).         %% Whether or not we should partition at the cluster level 
@@ -422,11 +425,11 @@ stop_nodes() ->
 
 write_object(Node, Key, Value) ->
     debug("write_object: node ~p key ~p value ~p", [Node, Key, Value]),
-    rpc:call(name_to_nodename(Node), unir, fsm_put, [Key, Value]).
+    rpc:call(name_to_nodename(Node), ?APP, fsm_put, [Key, Value]).
 
 read_object(Node, Key) ->
     debug("read_object: node ~p key ~p", [Node, Key]),
-    rpc:call(name_to_nodename(Node), unir, fsm_get, [Key]).
+    rpc:call(name_to_nodename(Node), ?APP, fsm_get, [Key]).
 
 induce_byzantine_message_corruption_fault(SourceNode, DestinationNode0, Value) ->
     debug("induce_byzantine_message_corruption_fault: source_node ~p destination_node ~p value ~p", [SourceNode, DestinationNode0, Value]),
@@ -901,7 +904,7 @@ is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
     end.
 
 induce_byzantine_disk_loss_fault(Node, Key) ->
-    rpc:call(name_to_nodename(Node), unir, inject_failure, [Key, undefined]).
+    rpc:call(name_to_nodename(Node), ?APP, inject_failure, [Key, undefined]).
 
 induce_byzantine_bit_flip_fault(Node, Key, Value) ->
-    rpc:call(name_to_nodename(Node), unir, inject_failure, [Key, Value]).
+    rpc:call(name_to_nodename(Node), ?APP, inject_failure, [Key, Value]).
