@@ -27,6 +27,8 @@
 %% TODO: Fix bit flip bugs.
 
 %% Partisan connection and forwarding settings.
+-define(EGRESS_DELAY, 0).
+-define(INGRESS_DELAY, 0).
 -define(VNODE_PARTITIONING, false).
 -define(PARALLELISM, 1).
 -define(CHANNELS, [broadcast, vnode, {monotonic, gossip}]).
@@ -388,6 +390,8 @@ start_nodes() ->
               {channels, ?CHANNELS},
               {vnode_partitioning, ?VNODE_PARTITIONING},
               {causal_labels, ?CAUSAL_LABELS},
+              {egress_delay, ?EGRESS_DELAY},
+              {ingress_delay, ?INGRESS_DELAY},
               {disable_fast_forward, true}],
 
     %% Initialize a cluster.
