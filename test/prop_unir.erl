@@ -45,6 +45,7 @@
 
 %% Other options to exercise pathological cases.
 -define(BIAS_MINORITY, false).                      %% Bias requests to minority partitions.
+-define(MONOTONIC_READS, false).                    %% Do we assume the system provides monotonic read?
 
 -export([command/1, 
          initial_state/0, 
@@ -663,13 +664,22 @@ node_functions() ->
 node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
     debug("read_object: returned key ~p value ~p", [Key, Value]),
     %% Only pass acknowledged reads.
+    StartingValues = [not_found],
+
     case dict:find(Key, DatabaseState) of
         {ok, KeyValues} ->
-            ItWasWritten = lists:member(Value, KeyValues),
+            ValueList = StartingValues ++ KeyValues,
+            debug("read_object: looking for ~p in ~p", [Value, ValueList]),
+            ItWasWritten = lists:member(Value, ValueList),
             debug("read_object: value read in write history: ~p", [ItWasWritten]),
             case ItWasWritten of
                 true ->
-                    is_monotonic_read(Key, Value, ClientState);
+                    case ?MONOTONIC_READS of
+                        true ->
+                            is_monotonic_read(Key, Value, ClientState);
+                        false ->
+                            true
+                    end;
                 false ->
                     false
             end;
@@ -714,17 +724,24 @@ node_precondition({_DatabaseState, _ClientState}, {call, _Mod, write_object, [_N
 
 %% Next state.
 
-%% Reads don't modify state.
+%% Failures don't modify what the state should be.
 node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_disk_loss_fault, [_Node, _Key]}) -> 
     {DatabaseState, ClientState};
 
 node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_bit_flip_fault, [_Node, _Key, _Value]}) -> 
     {DatabaseState, ClientState};
 
+%% Reads don't modify state.
+%% TODO: Advance client state on read.
 node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
     {DatabaseState, ClientState};
 
-%% All we know is that the write was acknowledged at *some* of the nodes.
+%% All we know is that the write was potentially acknowledged at some of the nodes.
+node_next_state({DatabaseState0, ClientState0}, {error, timeout}, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
+    DatabaseState = dict:append_list(Key, [Value], DatabaseState0),
+    {DatabaseState, ClientState0};
+
+%% Write succeeded at all nodes.
 node_next_state({DatabaseState0, ClientState0}, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
     DatabaseState = dict:append_list(Key, [Value], DatabaseState0),
     ClientState = dict:store(Key, Value, ClientState0),
