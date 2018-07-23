@@ -11,24 +11,30 @@
 
 -compile([export_all]).
 
+-import(prop_unir_vnode,
+        [node_commands/0,
+         node_initial_state/0,
+         node_functions/0,
+         node_precondition/2,
+         node_postcondition/3,
+         node_next_state/3]).
+
 -define(SUPPORT, support).
 
+%% TODO: Fix message corruption fault.
+%% TODO: Fix bit flip bugs.
+%% TODO: Fix node names.
+
+%% General test configuration
 -define(NUM_NODES, 3).
 -define(COMMAND_MULTIPLE, 10).
 -define(CLUSTER_NODES, true).
 -define(MANAGER, partisan_default_peer_service_manager).
 -define(DEBUG, true).
 
-%% Application under test.
--define(APP, unir).                                 %% The name of the top-level application that requests
-                                                    %% should be issued to using the RPC mechanism.
-
-%% TODO: Fix message corruption fault.
-%% TODO: Fix bit flip bugs.
-
 %% Partisan connection and forwarding settings.
 -define(EGRESS_DELAY, 0).                           %% How many milliseconds to delay outgoing messages?
--define(INGRESS_DELAY, 0).                          %% How many milliseconds to delay incoming messages?
+-define(INGRESS_DELAY, 0).                          %% How many millisconds to delay incoming messages?
 -define(VNODE_PARTITIONING, false).                 %% Should communication be partitioned by vnode identifier?
 -define(PARALLELISM, 1).                            %% How many connections should exist between nodes?
 -define(CHANNELS, 
@@ -46,18 +52,19 @@
                                                     %% ie. two-way communication prohibited between different nodes.
 -define(PERFORM_BYZANTINE_MESSAGE_FAULTS, false).   %% Whether or not we should use cluster byzantine faults:
                                                     %% ie. message corruption, etc.
--define(PERFORM_BYZANTINE_NODE_FAULTS, true).       %% Whether or not we should use cluster-specific byzantine faults.
-                                                    %% ie. data loss bugs, bit flips, etc.
 
-%% Other options to exercise pathological cases.
+%% Alternative configurations.
 -define(BIAS_MINORITY, false).                      %% Bias requests to minority partitions.
--define(MONOTONIC_READS, false).                    %% Do we assume the system provides monotonic read?
 
 -export([command/1, 
          initial_state/0, 
          next_state/3,
          precondition/2, 
          postcondition/3]).
+
+%%%===================================================================
+%%% Properties
+%%%===================================================================
 
 prop_sequential() ->
     ?FORALL(Cmds, more_commands(?COMMAND_MULTIPLE, commands(?MODULE)), 
@@ -81,6 +88,10 @@ prop_parallel() ->
                       aggregate(command_names(Cmds), Result =:= ok))
         end).
 
+%%%===================================================================
+%%% Initial state
+%%%===================================================================
+
 -record(state, {
                 joined_nodes :: [node()],
                 nodes :: [node()],
@@ -90,10 +101,6 @@ prop_parallel() ->
                 majority_nodes :: [node()], 
                 byzantine_faults :: dict:dict()
             }).
-
-%%%===================================================================
-%%% Generators
-%%%===================================================================
 
 %% Initial model value at system start. Should be deterministic.
 initial_state() -> 
@@ -374,18 +381,15 @@ next_state(#state{node_state=NodeState0}=State, Res, {call, _Mod, Fun, _Args}=Ca
 node_name() ->
     ?LET(Names, names(), oneof(Names)).
 
+corrupted_value() ->
+    ?LET(Binary, binary(), 
+        {erlang:timestamp(), Binary}).
+
 names() ->
     NameFun = fun(N) -> 
         list_to_atom("node_" ++ integer_to_list(N)) 
     end,
     lists:map(NameFun, lists:seq(1, ?NUM_NODES)).
-
-key() ->
-    oneof([<<"key">>]).
-
-value() ->
-    ?LET(Binary, binary(), 
-        {erlang:timestamp(), Binary}).
 
 %%%===================================================================
 %%% Cluster Functions
@@ -694,10 +698,6 @@ join_cluster(Name, [JoinedName|_]=JoinedNames) ->
             ok
     end.
 
-name_to_nodename(Name) ->
-    [{_, NodeName}] = ets:lookup(?MODULE, Name),
-    NodeName.
-
 enough_nodes_connected(Nodes) ->
     length(Nodes) >= 3.
 
@@ -719,7 +719,7 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
     ByzantineCommands = case ?PERFORM_BYZANTINE_MESSAGE_FAULTS of
         true ->
             [
-            {call, ?MODULE, induce_byzantine_message_corruption_fault, [node_name(), node_name(), value()]},
+            {call, ?MODULE, induce_byzantine_message_corruption_fault, [node_name(), node_name(), corrupted_value()]},
             {call, ?MODULE, resolve_byzantine_message_corruption_fault, [node_name(), node_name()]}
             ];
         false ->
@@ -772,156 +772,6 @@ cluster_commands(#state{joined_nodes=JoinedNodes}) ->
         ClusterPartitionCommands ++
         ByzantineCommands.
 
-%%%===================================================================
-%%% Node Functions
-%%%===================================================================
-
-%% What node-specific operations should be called.
-node_commands() ->
-    ByzantineCommands = case ?PERFORM_BYZANTINE_NODE_FAULTS of
-        true ->
-            [
-            {call, ?MODULE, induce_byzantine_disk_loss_fault, [node_name(), key()]},
-            {call, ?MODULE, induce_byzantine_bit_flip_fault, [node_name(), key(), binary()]}
-            ];
-        false ->
-            []
-    end,
-
-    [
-     {call, ?MODULE, read_object, [node_name(), key()]},
-     {call, ?MODULE, write_object, [node_name(), key(), value()]}
-    ] ++
-
-    ByzantineCommands.
-
-%% What should the initial node state be.
-node_initial_state() ->
-    {dict:new(), dict:new()}.
-
-%% Names of the node functions so we kow when we can dispatch to the node
-%% pre- and postconditions.
-node_functions() ->
-    lists:map(fun({call, _Mod, Fun, _Args}) -> Fun end, node_commands()).
-
-%% Postconditions for node commands.
-node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_Node, Key]}, {ok, Value}) -> 
-    debug("read_object: returned key ~p value ~p", [Key, Value]),
-    %% Only pass acknowledged reads.
-    StartingValues = [not_found],
-
-    case dict:find(Key, DatabaseState) of
-        {ok, KeyValues} ->
-            ValueList = StartingValues ++ KeyValues,
-            debug("read_object: looking for ~p in ~p", [Value, ValueList]),
-            ItWasWritten = lists:member(Value, ValueList),
-            debug("read_object: value read in write history: ~p", [ItWasWritten]),
-            case ItWasWritten of
-                true ->
-                    case ?MONOTONIC_READS of
-                        true ->
-                            is_monotonic_read(Key, Value, ClientState);
-                        false ->
-                            true
-                    end;
-                false ->
-                    false
-            end;
-        _ ->
-            case Value of
-                not_found ->
-                    debug("read_object: object wasn't written yet, not_found might be OK", []),
-                    is_monotonic_read(Key, Value, ClientState);
-                _ ->
-                    debug("read_object: consistency violation, object was not written but was read", []),
-                    false
-            end
-    end;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, read_object, [Node, Key]}, {error, timeout}) -> 
-    debug("read_object ~p ~p timeout", [Node, Key]),
-    %% Consider timeouts as failures for now.
-    false;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_bit_flip_fault, [Node, Key, Value]}, ok) -> 
-    debug("induce_byzantine_bit_flip_fault: ~p ~p ~p", [Node, Key, Value]),
-    true;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, induce_byzantine_disk_loss_fault, [Node, Key]}, ok) -> 
-    debug("induce_byzantine_disk_loss_fault: ~p ~p", [Node, Key]),
-    true;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object, [_Node, _Key, _Value]}, {ok, _Value}) -> 
-    debug("write_object returned ok", []),
-    %% Only pass acknowledged writes.
-    true;
-node_postcondition({_DatabaseState, _ClientState}, {call, ?MODULE, write_object, [Node, Key, _Value]}, {error, timeout}) -> 
-    debug("write_object ~p ~p timeout", [Node, Key]),
-    %% Consider timeouts as failures for now.
-    false.
-
-%% Precondition.
-node_precondition({_DatabaseState, _ClientState}, {call, _Mod, induce_byzantine_disk_loss_fault, [_Node, _Key]}) -> 
-    true;
-node_precondition({_DatabaseState, _ClientState}, {call, _Mod, induce_byzantine_bit_flip_fault, [_Node, _Key, _Value]}) -> 
-    true;
-node_precondition({_DatabaseState, _ClientState}, {call, _Mod, read_object, [_Node, _Key]}) -> 
-    true;
-node_precondition({_DatabaseState, _ClientState}, {call, _Mod, write_object, [_Node, _Key, _Value]}) -> 
-    true.
-
-%% Next state.
-
-%% Failures don't modify what the state should be.
-node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_disk_loss_fault, [_Node, _Key]}) -> 
-    {DatabaseState, ClientState};
-
-node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, induce_byzantine_bit_flip_fault, [_Node, _Key, _Value]}) -> 
-    {DatabaseState, ClientState};
-
-%% Reads don't modify state.
-%% TODO: Advance client state on read.
-node_next_state({DatabaseState, ClientState}, _Res, {call, ?MODULE, read_object, [_Node, _Key]}) -> 
-    {DatabaseState, ClientState};
-
-%% All we know is that the write was potentially acknowledged at some of the nodes.
-node_next_state({DatabaseState0, ClientState0}, {error, timeout}, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
-    DatabaseState = dict:append_list(Key, [Value], DatabaseState0),
-    {DatabaseState, ClientState0};
-
-%% Write succeeded at all nodes.
-node_next_state({DatabaseState0, ClientState0}, _Res, {call, ?MODULE, write_object, [_Node, Key, Value]}) -> 
-    DatabaseState = dict:append_list(Key, [Value], DatabaseState0),
-    ClientState = dict:store(Key, Value, ClientState0),
-    {DatabaseState, ClientState}.
-
-is_monotonic_read(Key, not_found, ClientState) ->
-    case dict:find(Key, ClientState) of
-        {ok, {_LastReadTimestamp, _LastReadBinary} = LastReadValue} ->
-            debug("got not_found, should have read ~p", [LastReadValue]),
-            false;
-        _ ->
-            true
-    end;
-%% Old style tests.
-is_monotonic_read(_Key, Binary, _ClientState) when is_binary(Binary) ->
-    true;
-is_monotonic_read(Key, {ReadTimestamp, _ReadBinary} = ReadValue, ClientState) ->
-    case dict:find(Key, ClientState) of
-        {ok, {LastReadTimestamp, _LastReadBinary} = LastReadValue} ->
-            Result = timer:now_diff(ReadTimestamp, LastReadTimestamp) >= 0,
-            debug("last read ~p now read ~p, result ~p", [LastReadValue, ReadValue, Result]),
-            Result;
-        _ ->
-            true
-    end.
-
-induce_byzantine_disk_loss_fault(Node, Key) ->
-    rpc:call(name_to_nodename(Node), ?APP, inject_failure, [Key, undefined]).
-
-induce_byzantine_bit_flip_fault(Node, Key, Value) ->
-    rpc:call(name_to_nodename(Node), ?APP, inject_failure, [Key, Value]).
-
-write_object(Node, Key, Value) ->
-    debug("write_object: node ~p key ~p value ~p", [Node, Key, Value]),
-    rpc:call(name_to_nodename(Node), ?APP, fsm_put, [Key, Value]).
-
-read_object(Node, Key) ->
-    debug("read_object: node ~p key ~p", [Node, Key]),
-    rpc:call(name_to_nodename(Node), ?APP, fsm_get, [Key]).
+name_to_nodename(Name) ->
+    [{_, NodeName}] = ets:lookup(?MODULE, Name),
+    NodeName.
