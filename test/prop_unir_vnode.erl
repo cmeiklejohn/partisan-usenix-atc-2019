@@ -19,6 +19,7 @@
 -define(PERFORM_BYZANTINE_NODE_FAULTS, false).      %% Whether or not we should use cluster-specific byzantine faults.
                                                     %% ie. data loss bugs, bit flips, etc.
 -define(MONOTONIC_READS, false).                    %% Do we assume the system provides monotonic read?
+-define(STRONG_READS, false).                       %% Do we assume the system provides strong reads?
 -define(NUM_NODES, 3).
 -define(NODE_DEBUG, true).                          %% Should we print out debugging information?
 
@@ -96,7 +97,13 @@ node_postcondition({DatabaseState, ClientState}, {call, ?MODULE, read_object, [_
                         true ->
                             is_monotonic_read(Key, Value, ClientState);
                         false ->
-                            true
+                            case ?STRONG_READS of
+                                true ->
+                                    MostRecentValue = hd(lists:reverse(ValueList)),
+                                    MostRecentValue =:= Value;
+                                false ->
+                                    true
+                            end
                     end;
                 false ->
                     false

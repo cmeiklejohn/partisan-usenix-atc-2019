@@ -24,6 +24,8 @@
 %% TODO: Fix message corruption fault.
 %% TODO: Fix bit flip bugs.
 %% TODO: Fix node names.
+%% TODO: Message ommission.
+%% TODO: Jitter the timers with deterministic seed.
 
 %% General test configuration
 -define(NUM_NODES, 3).
