@@ -290,7 +290,7 @@ partisan_performance_test(Config) ->
         VP ->
             VP
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, false, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     case Profile of
@@ -414,7 +414,13 @@ echo_performance_test(Config) ->
         VP ->
             VP
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [echo, Backend, Concurrency, NumChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
+    MonotonicChannels = case ?config(monotonic_channels, Config) of
+        undefined ->
+            false;
+        MC ->
+            MC
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [echo, Backend, Concurrency, NumChannels, MonotonicChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     ct:pal("Time: ~p", [Time]),
@@ -521,13 +527,19 @@ fsm_performance_test(Config) ->
         List ->
             length(List)
     end,
+    MonotonicChannels = case ?config(monotonic_channels, Config) of
+        undefined ->
+            false;
+        MC ->
+            MC
+    end,
     Partitioned = case ?config(vnode_partitioning, Config) of
         undefined ->
             false;
         VP ->
             VP
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [kvs, Backend, Concurrency, NumChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [kvs, Backend, Concurrency, NumChannels, MonotonicChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     ct:pal("Value: ~p, Time: ~p", [Value, Time]),
@@ -845,7 +857,7 @@ channels() ->
 
 %% @private
 monotonic_channels() ->
-    [{channels, [undefined, {monotonic, gossip}, broadcast, vnode]}].
+    [{monotonic_channels, true}, {channels, [undefined, {monotonic, gossip}, broadcast, vnode]}].
 
 %% @private
 bench_receiver(Count) ->
