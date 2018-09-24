@@ -63,7 +63,7 @@ end_per_testcase(Case, Config) ->
     Config.
 
 init_per_group(disterl, Config) ->
-    Config;
+    [{disterl, true}] ++ Config;
 
 init_per_group(partisan, Config) ->
     [{pid_encoding, false}, {partisan_dispatch, true}] ++ Config;
