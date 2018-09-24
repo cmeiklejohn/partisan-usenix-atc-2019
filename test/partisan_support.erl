@@ -148,6 +148,15 @@ start(_Case, Config, Options) ->
             ct:pal("Setting broadcast to: ~p", [Broadcast]),
             ok = rpc:call(Node, partisan_config, set, [broadcast, Broadcast]),
 
+            PidEncoding = case ?config(pid_encoding, Config) of
+                              undefined ->
+                                  true;
+                              PE ->
+                                  PE
+                        end,
+            ct:pal("Setting pid_encoding to: ~p", [PidEncoding]),
+            ok = rpc:call(Node, partisan_config, set, [pid_encoding, PidEncoding]),
+
             Channels = case ?config(channels, Config) of
                               undefined ->
                                   ?CHANNELS;
