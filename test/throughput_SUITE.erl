@@ -72,10 +72,14 @@ init_per_group(partisan_with_parallelism, Config) ->
     parallelism() ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_channels, Config) ->
     channels() ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_monotonic_channels, Config) ->
+    monotonic_channels() ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_partitioned_parallelism, Config) ->
     parallelism() ++ [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_partitioned_parallelism_and_channels, Config) ->
     channels() ++ parallelism() ++ [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_partitioned_parallelism_and_channels_and_monotonic_channels, Config) ->
+    monotonic_channels() ++ parallelism() ++ [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_vnode_partitioning, Config) ->
@@ -118,10 +122,16 @@ groups() ->
      {partisan_with_channels, [],
       [{group, bench}]},
 
+     {partisan_with_monotonic_channels, [],
+      [{group, bench}]},
+
      {partisan_with_partitioned_parallelism, [],
       [{group, bench}]},
 
      {partisan_with_partitioned_parallelism_and_channels, [],
+      [{group, bench}]},
+
+     {partisan_with_partitioned_parallelism_and_channels_and_monotonic_channels, [],
       [{group, bench}]},
 
      {partisan_with_binary_padding, [],
@@ -832,6 +842,10 @@ parallelism() ->
 %% @private
 channels() ->
     [{channels, [undefined, gossip, broadcast, vnode]}].
+
+%% @private
+monotonic_channels() ->
+    [{channels, [undefined, {monotonic, gossip}, broadcast, vnode]}].
 
 %% @private
 bench_receiver(Count) ->
