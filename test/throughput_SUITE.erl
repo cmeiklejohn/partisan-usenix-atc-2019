@@ -274,7 +274,13 @@ partisan_performance_test(Config) ->
         List ->
             length(List)
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    Partitioned = case ?config(vnode_partitioning, Config) of
+        undefined ->
+            false;
+        VP ->
+            VP
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     case Profile of
@@ -392,7 +398,13 @@ echo_performance_test(Config) ->
         List ->
             length(List)
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [echo, Backend, Concurrency, NumChannels, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    Partitioned = case ?config(vnode_partitioning, Config) of
+        undefined ->
+            false;
+        VP ->
+            VP
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [echo, Backend, Concurrency, NumChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     ct:pal("Time: ~p", [Time]),
@@ -499,7 +511,13 @@ fsm_performance_test(Config) ->
         List ->
             length(List)
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [kvs, Backend, Concurrency, NumChannels, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    Partitioned = case ?config(vnode_partitioning, Config) of
+        undefined ->
+            false;
+        VP ->
+            VP
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [kvs, Backend, Concurrency, NumChannels, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     ct:pal("Value: ~p, Time: ~p", [Value, Time]),
