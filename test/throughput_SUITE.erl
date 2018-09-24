@@ -70,8 +70,12 @@ init_per_group(partisan, Config) ->
 
 init_per_group(partisan_with_parallelism, Config) ->
     parallelism() ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_channels, Config) ->
+    channels() ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_partitioned_parallelism, Config) ->
     parallelism() ++ [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
+init_per_group(partisan_with_partitioned_parallelism_and_channels, Config) ->
+    channels() ++ parallelism() ++ [{vnode_partitioning, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_binary_padding, Config) ->
     [{binary_padding, true}] ++ init_per_group(partisan, Config);
 init_per_group(partisan_with_vnode_partitioning, Config) ->
@@ -94,7 +98,7 @@ all() ->
 groups() ->
     [
      {bench, [],
-      [bench_test,
+      [%% bench_test,
        fsm_performance_test,
        partisan_performance_test,
        echo_performance_test]},
@@ -111,7 +115,13 @@ groups() ->
      {partisan_with_parallelism, [],
       [{group, bench}]},
 
+     {partisan_with_channels, [],
+      [{group, bench}]},
+
      {partisan_with_partitioned_parallelism, [],
+      [{group, bench}]},
+
+     {partisan_with_partitioned_parallelism_and_channels, [],
       [{group, bench}]},
 
      {partisan_with_binary_padding, [],
@@ -256,7 +266,15 @@ partisan_performance_test(Config) ->
         _ ->
             disterl
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    NumChannels = case ?config(channels, Config) of
+        undefined ->
+            1;
+        [] ->
+            1;
+        List ->
+            length(List)
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, Parallelism, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     case Profile of
@@ -366,7 +384,15 @@ echo_performance_test(Config) ->
         _ ->
             disterl
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    NumChannels = case ?config(channels, Config) of
+        undefined ->
+            1;
+        [] ->
+            1;
+        List ->
+            length(List)
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [echo, Backend, Concurrency, NumChannels, Parallelism, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     ct:pal("Time: ~p", [Time]),
@@ -465,7 +491,15 @@ fsm_performance_test(Config) ->
         _ ->
             disterl
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p~n", [Backend, Concurrency, Parallelism, BytesSize, NumMessages, Latency, Time]),
+    NumChannels = case ?config(channels, Config) of
+        undefined ->
+            1;
+        [] ->
+            1;
+        List ->
+            length(List)
+    end,
+    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [kvs, Backend, Concurrency, NumChannels, Parallelism, BytesSize, NumMessages, Latency, Time]),
     file:close(FileHandle),
 
     ct:pal("Value: ~p, Time: ~p", [Value, Time]),
@@ -776,6 +810,10 @@ parallelism() ->
         Config ->
             [{parallelism, list_to_integer(Config)}]
     end.
+
+%% @private
+channels() ->
+    [undefined, gossip, broadcast, vnode].
 
 %% @private
 bench_receiver(Count) ->
