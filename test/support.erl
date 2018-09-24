@@ -272,10 +272,25 @@ start(_Case, Config, Options) ->
             ok = rpc:call(Node, partisan_config, set, [max_active_size, MaxActiveSize]),
             ok = rpc:call(Node, partisan_config, set, [tls, ?config(tls, Config)]),
 
-            % ct:pal("Configuring channels: ~p", [?DEFAULT_CHANNELS]),
-            ok = rpc:call(Node, partisan_config, set, [channels, ?DEFAULT_CHANNELS]),
+            Channels = case ?config(channels, Config) of
+                          undefined ->
+                              [];
+                          ChannelList ->
+                              ChannelList
+                       end,
+            ct:pal("Configuring channels: ~p", [Channels]),
+            ok = rpc:call(Node, partisan_config, set, [channels, Channels]),
 
-            % ct:pal("Disabling gossip.", []),
+            PidEncoding = case ?config(pid_encoding, Config) of
+                          undefined ->
+                              false;
+                          PE ->
+                              PE
+                       end,
+            ct:pal("Configuring pid encoding: ~p", [PidEncoding]),
+            ok = rpc:call(Node, partisan_config, set, [pid_encoding, PidEncoding]),
+
+            ct:pal("Disabling gossip.", []),
             ok = rpc:call(Node, partisan_config, set, [gossip, false])
     end,
     lists:foreach(ConfigureFun, Nodes),

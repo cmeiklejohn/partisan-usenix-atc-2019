@@ -66,7 +66,7 @@ init_per_group(disterl, Config) ->
     Config;
 
 init_per_group(partisan, Config) ->
-    [{partisan_dispatch, true}] ++ Config;
+    [{pid_encoding, false}, {partisan_dispatch, true}] ++ Config;
 
 init_per_group(partisan_with_parallelism, Config) ->
     parallelism() ++ init_per_group(partisan, Config);
@@ -740,7 +740,7 @@ echo_sender(BenchPid, _SenderNum, _EchoBinary, 0) ->
     ok;
 echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
     unir:echo(EchoBinary),
-    echo_sender(BenchPid, SenderNum, EchoBinary, Count -1).
+    echo_sender(BenchPid, SenderNum, EchoBinary, Count - 1).
 
 %% @private
 init_echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
