@@ -125,7 +125,12 @@ start(_Case, Config, Options) ->
                               true ->
                                   false;
                               _ ->
-                                  false
+                                  case ?config(disterl, Config) of
+                                      true ->
+                                          true;
+                                      _ ->
+                                        false
+                                  end
                           end,
             ct:pal("Setting disterl to: ~p", [Disterl]),
             ok = rpc:call(Node, partisan_config, set, [disterl, Disterl]),
