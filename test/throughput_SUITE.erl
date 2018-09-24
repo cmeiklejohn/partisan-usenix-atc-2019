@@ -813,7 +813,7 @@ parallelism() ->
 
 %% @private
 channels() ->
-    [undefined, gossip, broadcast, vnode].
+    [{channels, [undefined, gossip, broadcast, vnode]}].
 
 %% @private
 bench_receiver(Count) ->
