@@ -1,0 +1,6 @@
+disterl,1,1,1048576,1000,1,165794753
+echo,partisan,1,1,1,1048576,1000,1,171037766
+partisan,disterl,1,1,false,1,false,1048576,1000,1,10588307
+partisan,partisan,1,1,false,1,false,1048576,1000,1,7906111
+partisan,partisan,1,1,false,1,false,1048576,1000,1,8128820
+partisan,disterl,1,1,false,1,false,1048576,1000,1,11528927

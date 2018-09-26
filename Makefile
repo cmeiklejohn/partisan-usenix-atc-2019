@@ -78,6 +78,11 @@ echo-bench:
 	pkill -9 beam.smp; pkill -9 epmd; exit 0
 	BENCH_CONFIG=echo.config $(REBAR) ct --suite=throughput_SUITE --group=partisan_with_parallelism --case=bench_test --readable=false -v
 
+kvs-latency: release
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=disterl
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=partisan
+	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=partisan_with_partitioned_parallelism_and_channels_and_monotonic_channels
+
 fsm-perf: release
 	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=disterl
 	pkill -9 beam.smp; pkill -9 epmd; SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=fsm_performance_test --group=partisan

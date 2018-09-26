@@ -801,8 +801,15 @@ fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure, Count) ->
     %% Craft object name.
     ObjectName = list_to_binary("object" ++ integer_to_list(RandomNumber)),
 
-    %% 50/50 read/write workload.
-    case Count rem 2 == 0 of
+    case Count rem 100 == 0 of
+        true ->
+            lager:info("~p has ~p messages remaining to be sent...", [self(), Count]);
+        _ ->
+            ok
+    end,
+
+    %% 90/10 read/write workload.
+    case Count rem 10 == 0 of
         true ->
             case unir:fsm_put(ObjectName, EchoBinary) of
                 {ok, _Val} ->
