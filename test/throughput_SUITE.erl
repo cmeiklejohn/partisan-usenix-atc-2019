@@ -242,7 +242,7 @@ partisan_performance_test(Config) ->
     ct:pal("Spawning processes."),
     SenderPids = lists:map(fun(SenderNum) ->
         ReceiverFun = fun() ->
-            receiver(Manager, BenchPid, NumMessages)
+            receiver(Manager, BenchPid, NumMessages, [])
         end,
         ReceiverPid = rpc:call(Node2, erlang, spawn, [ReceiverFun]),
 
@@ -263,7 +263,7 @@ partisan_performance_test(Config) ->
         %% Wait for them all.
         bench_receiver(Concurrency)
     end,
-    {Time, _Value} = timer:tc(ProfileFun),
+    {Time, Tdiffs} = timer:tc(ProfileFun),
 
     %% Write results.
     RootDir = root_dir(Config),
@@ -290,7 +290,16 @@ partisan_performance_test(Config) ->
         VP ->
             VP
     end,
-    io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, false, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]),
+    ct:pal("Tdiffs are: ~p", [Tdiffs]),
+    case Tdiffs of
+        [] ->
+            io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, false, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Time]);
+        Tdiffs when is_list(Tdiffs) ->
+            lists:foreach(fun(Tdiff) ->
+                io:format(FileHandle, "~p,~p,~p,~p,~p,~p,~p,~p,~p,~p,~p~n", [App, Backend, Concurrency, NumChannels, false, Parallelism, Partitioned, BytesSize, NumMessages, Latency, Tdiff])
+            end, Tdiffs)
+    end,
+
     file:close(FileHandle),
 
     case Profile of
@@ -868,39 +877,47 @@ monotonic_channels() ->
 
 %% @private
 bench_receiver(Count) ->
-    bench_receiver(0, 0, Count).
+    bench_receiver(0, 0, Count, []).
 
 %% @private
-bench_receiver(Success, Failure, 0) ->
+bench_receiver(Success, Failure, 0, Tdiffs) ->
     ct:pal("Success: ~p, Failure: ~p", [Success, Failure]),
-    ok;
-bench_receiver(Success, Failure, Count) ->
+    lists:flatten(Tdiffs);
+bench_receiver(Success, Failure, Count, Tdiffs) ->
     ct:pal("Waiting for ~p processes to finish...", [Count]),
 
     receive
         done ->
-            ct:pal("Received, but still waiting for ~p", [Count -1]),
-            bench_receiver(Success, Failure, Count - 1);
+            ct:pal("Received, but still waiting for ~p", [Count - 1]),
+            bench_receiver(Success, Failure, Count - 1, Tdiffs);
+        {done, Tdiff} ->
+            ct:pal("Received, but still waiting for ~p", [Count - 1]),
+            bench_receiver(Success, Failure, Count - 1, Tdiffs ++ [Tdiff]);
         {done, S, F} ->
-            ct:pal("Received; success: ~p, failure: ~p; but still waiting for ~p", [S, F, Count -1]),
-            bench_receiver(Success + S, Failure + F, Count - 1)
+            ct:pal("Received; success: ~p, failure: ~p; but still waiting for ~p", [S, F, Count - 1]),
+            bench_receiver(Success + S, Failure + F, Count - 1, Tdiffs)
     end.
 
 %% @private
-receiver(_Manager, BenchPid, 0) ->
-    BenchPid ! done,
+receiver(_Manager, BenchPid, 0, Tdiffs) ->
+    BenchPid ! {done, Tdiffs},
     ok;
-receiver(Manager, BenchPid, Count) ->
+receiver(Manager, BenchPid, Count, Tdiffs) ->
     receive
         {_Message, _SourceNode, _SourcePid} ->
-            receiver(Manager, BenchPid, Count - 1)
+            receiver(Manager, BenchPid, Count - 1, Tdiffs);
+        {_Message, _SourceNode, _SourcePid, StartTime} ->
+            EndTime = erlang:now(),
+            Tdiff = timer:now_diff(EndTime, StartTime),
+            receiver(Manager, BenchPid, Count - 1, Tdiffs ++ [Tdiff])
     end.
 
 %% @private
 sender(_EchoBinary, _Manager, _DestinationNode, _DestinationPid, _PartitionKey, 0) ->
     ok;
 sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count) ->
-    Manager:forward_message(DestinationNode, undefined, DestinationPid, {EchoBinary, node(), self()}, [{partition_key, PartitionKey}]),
+    StartTime = erlang:now(),
+    Manager:forward_message(DestinationNode, undefined, DestinationPid, {EchoBinary, node(), self(), StartTime}, [{partition_key, PartitionKey}]),
     sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count - 1).
 
 %% @private
