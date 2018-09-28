@@ -821,7 +821,7 @@ init_echo_sender(BenchPid, SenderNum, EchoBinary, Count) ->
         start ->
             ok
     end,
-    timer:send_after(300 * 1000, done),
+    timer:send_after(120 * 1000, done),
     echo_sender(BenchPid, SenderNum, EchoBinary, Count, []).
 
 %% @private
@@ -878,7 +878,7 @@ init_fsm_sender(BenchPid, SenderNum, EchoBinary, Count) ->
         start ->
             ok
     end,
-    timer:send_after(300 * 1000, done),
+    timer:send_after(120 * 1000, done),
     fsm_sender(BenchPid, SenderNum, EchoBinary, 0, 0, Count, []).
 
 %% @private
