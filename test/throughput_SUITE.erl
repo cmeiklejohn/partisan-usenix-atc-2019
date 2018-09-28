@@ -159,6 +159,7 @@ partisan_performance_test(Config) ->
             %% Start nodes.
             partisan_support:start(partisan_performance_test, Config,
                                    [{partisan_peer_service_manager, Manager},
+                                   {sync_join, true},
                                    {servers, Servers},
                                    {clients, Clients}]);
         _ ->
@@ -808,9 +809,9 @@ echo_sender(BenchPid, SenderNum, EchoBinary, Count, Tdiffs) ->
             BenchPid ! {done, Tdiffs}
     after
         0 ->
-            StartTime = erlang:now(),
+            StartTime = erlang:timestamp(),
             unir:echo(EchoBinary),
-            EndTime = erlang:now(),
+            EndTime = erlang:timestamp(),
             Tdiff = timer:now_diff(EndTime, StartTime),
             echo_sender(BenchPid, SenderNum, EchoBinary, Count - 1, Tdiffs ++ [Tdiff])
     end.
@@ -835,7 +836,7 @@ fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure, Count, Tdiffs) ->
             BenchPid ! {done, Tdiffs}
     after
         0 ->
-            StartTime = erlang:now(),
+            StartTime = erlang:timestamp(),
             %% Normal distribution over 10000 keys.
             RandomNumber = trunc((rand:normal() + 1) * 5000),
 
@@ -854,7 +855,7 @@ fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure, Count, Tdiffs) ->
                 true ->
                     case unir:fsm_put(ObjectName, EchoBinary) of
                         {ok, _Val} ->
-                            EndTime = erlang:now(),
+                            EndTime = erlang:timestamp(),
                             Tdiff = timer:now_diff(EndTime, StartTime),
                             fsm_sender(BenchPid, SenderNum, EchoBinary, Success + 1, Failure, Count - 1, Tdiffs ++ [Tdiff]);
                         {error, timeout} ->
@@ -863,7 +864,7 @@ fsm_sender(BenchPid, SenderNum, EchoBinary, Success, Failure, Count, Tdiffs) ->
                 false ->
                     case unir:fsm_get(ObjectName) of
                         {ok, _Val} ->
-                            EndTime = erlang:now(),
+                            EndTime = erlang:timestamp(),
                             Tdiff = timer:now_diff(EndTime, StartTime),
                             fsm_sender(BenchPid, SenderNum, EchoBinary, Success + 1, Failure, Count - 1, Tdiffs ++ [Tdiff]);
                         {error, timeout} ->
@@ -944,8 +945,9 @@ receiver(Manager, BenchPid, Count, Tdiffs) ->
     receive
         {_Message, _SourceNode, _SourcePid} ->
             receiver(Manager, BenchPid, Count - 1, Tdiffs);
-        {_Message, _SourceNode, _SourcePid, StartTime} ->
-            EndTime = erlang:now(),
+        {_Message, _SourceNode, SourcePid, StartTime} ->
+            EndTime = erlang:timestamp(),
+            SourcePid ! ok,
             Tdiff = timer:now_diff(EndTime, StartTime),
             receiver(Manager, BenchPid, Count - 1, Tdiffs ++ [Tdiff])
     end.
@@ -954,8 +956,12 @@ receiver(Manager, BenchPid, Count, Tdiffs) ->
 sender(_EchoBinary, _Manager, _DestinationNode, _DestinationPid, _PartitionKey, 0) ->
     ok;
 sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count) ->
-    StartTime = erlang:now(),
+    StartTime = erlang:timestamp(),
     Manager:forward_message(DestinationNode, undefined, DestinationPid, {EchoBinary, node(), self(), StartTime}, [{partition_key, PartitionKey}]),
+    receive
+        ok ->
+            ok
+    end,
     sender(EchoBinary, Manager, DestinationNode, DestinationPid, PartitionKey, Count - 1).
 
 %% @private
