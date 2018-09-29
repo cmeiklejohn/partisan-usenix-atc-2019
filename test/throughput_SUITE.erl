@@ -368,7 +368,7 @@ echo_performance_test(Config) ->
             P
     end,
         
-    NumMessages = 1000,
+    NumMessages = 100000,
     BenchPid = self(),
     BytesSize = Size * 1024,
 
@@ -494,7 +494,7 @@ fsm_performance_test(Config) ->
             P
     end,
         
-    NumMessages = 1000,
+    NumMessages = 100000,
     BenchPid = self(),
     BytesSize = Size * 1024,
 
