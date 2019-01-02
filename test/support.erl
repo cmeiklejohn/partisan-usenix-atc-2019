@@ -98,7 +98,7 @@ start(_Case, Config, Options) ->
                             lager:info("Starting node: ~p", [NameToStart]),
 
                             NodeConfig = [{monitor_master, true},
-                                          {erl_flags, "-smp"}, %% smp for the eleveldb god
+                                          {erl_flags, "+K true -smp"}, %% smp for the eleveldb god
                                           {startup_functions,
                                            [{code, set_path, [codepath()]}]}],
 

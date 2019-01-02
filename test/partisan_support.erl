@@ -58,6 +58,7 @@ start(_Case, Config, Options) ->
                             ct:pal("Starting node: ~p", [Name]),
 
                             NodeConfig = [{monitor_master, true},
+                                          {erl_flags, "+K true -smp"}, %% smp for the eleveldb god
                                           {startup_functions, [{code, set_path, [codepath()]}]}],
 
                             case ct_slave:start(Name, NodeConfig) of
