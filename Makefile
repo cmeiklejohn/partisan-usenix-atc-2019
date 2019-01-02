@@ -111,7 +111,7 @@ partisan-perf: release
 	# pkill -9 beam.smp; pkill -9 epmd; PARTISAN_INIT=true SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=partisan_with_partitioned_parallelism
 	pkill -9 beam.smp; pkill -9 epmd; PARTISAN_INIT=true SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=partisan_with_partitioned_parallelism_and_channels
 
-figure5: release
+figure-5: release
 	pkill -9 beam.smp; pkill -9 epmd; PARTISAN_INIT=true SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=disterl
 	pkill -9 beam.smp; pkill -9 epmd; PARTISAN_INIT=true SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=partisan
 	# pkill -9 beam.smp; pkill -9 epmd; PARTISAN_INIT=true SIZE=${SIZE} LATENCY=${LATENCY} CONCURRENCY=${CONCURRENCY} PARALLELISM=${CONCURRENCY} ${REBAR} ct --readable=false -v --suite=throughput_SUITE --case=partisan_performance_test --group=partisan_with_channels
