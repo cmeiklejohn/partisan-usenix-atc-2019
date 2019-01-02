@@ -11,3 +11,4 @@ results.csv
 rebar3.crashdump
 results-*
 dets/
+*.csv
