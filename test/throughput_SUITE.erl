@@ -231,7 +231,7 @@ partisan_performance_test(Config) ->
             P
     end,
         
-    NumMessages = 1000,
+    NumMessages = 10000,
     BenchPid = self(),
     BytesSize = Size * 1024,
 
