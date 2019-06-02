@@ -12,3 +12,5 @@ LATENCY=1 SIZE=8192 CONCURRENCY=64 make microbenchmarks-largepayload
 LATENCY=1 SIZE=8192 CONCURRENCY=128 make microbenchmarks-largepayload
 
 sudo tc qdisc del dev lo root netem
+
+mv results.csv microbenchmarks-largepayload.csv
