@@ -4,7 +4,7 @@ Here you can find the test harness used for generating all of our results.
 Obviously, your results will differ from ours if you do not use the same
 experimental configuration as we do.
 
-Preliminary results are available [here.](https://partisan.cloud)
+Preliminary results are available [here.](http://partisan.cloud)
 
 This repository includes a microbenchmark suite for Partisan itself, and a
 port of Riak Core (from Basho) ported to Partisan for running experiments
