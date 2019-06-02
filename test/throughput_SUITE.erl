@@ -230,7 +230,7 @@ partisan_performance_test(Config) ->
         P ->
             P
     end,
-        
+
     NumMessages = 10000,
     BenchPid = self(),
     BytesSize = Size * 1024,
@@ -242,13 +242,23 @@ partisan_performance_test(Config) ->
     %% Spawn processes to send receive messages on node 1.
     ct:pal("Spawning processes."),
     SenderPids = lists:map(fun(SenderNum) ->
+	PartitionKey = case rpc:call(Node1, partisan_config, get, [vnode_partitioning]) of
+		undefined ->
+			undefined;
+		false ->
+			undefined; 
+		true ->
+			SenderNum
+	end,
+	lager:warning("******** USING PARITION KEY FOR SENDER: ~p", [PartitionKey]),
+        
         ReceiverFun = fun() ->
             receiver(Manager, BenchPid, NumMessages, [])
         end,
         ReceiverPid = rpc:call(Node2, erlang, spawn, [ReceiverFun]),
 
         SenderFun = fun() ->
-            init_sender(EchoBinary, Manager, Node2, ReceiverPid, SenderNum, NumMessages)
+            init_sender(EchoBinary, Manager, Node2, ReceiverPid, PartitionKey, NumMessages)
         end,
         SenderPid = rpc:call(Node1, erlang, spawn, [SenderFun]),
         SenderPid
