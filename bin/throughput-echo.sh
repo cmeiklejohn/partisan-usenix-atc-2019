@@ -1,67 +1,57 @@
 #!/bin/bash
 
-sudo tc qdisc del dev lo root netem
+rm results.csv
 
-# 1ms RTT
-sudo tc qdisc add dev lo root netem delay 0.5ms
+for N in 1 2 3 4 5
+do
+	sudo tc qdisc del dev lo root netem
 
-LATENCY=1 SIZE=512 CONCURRENCY=1 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=2 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=4 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=8 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=16 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=32 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=64 make echo-perf
-LATENCY=1 SIZE=512 CONCURRENCY=128 make echo-perf
+	# 1ms RTT
+	sudo tc qdisc add dev lo root netem delay 0.5ms
 
-LATENCY=1 SIZE=1024 CONCURRENCY=1 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=2 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=4 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=8 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=16 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=32 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=64 make echo-perf
-LATENCY=1 SIZE=1024 CONCURRENCY=128 make echo-perf
+	LATENCY=1 SIZE=1 CONCURRENCY=16 make echo-perf
+	LATENCY=1 SIZE=1 CONCURRENCY=32 make echo-perf
+	LATENCY=1 SIZE=1 CONCURRENCY=64 make echo-perf
+	LATENCY=1 SIZE=1 CONCURRENCY=128 make echo-perf
 
-LATENCY=1 SIZE=8192 CONCURRENCY=1 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=2 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=4 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=8 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=16 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=32 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=64 make echo-perf
-LATENCY=1 SIZE=8192 CONCURRENCY=128 make echo-perf
+	LATENCY=1 SIZE=512 CONCURRENCY=16 make echo-perf
+	LATENCY=1 SIZE=512 CONCURRENCY=32 make echo-perf
+	LATENCY=1 SIZE=512 CONCURRENCY=64 make echo-perf
+	LATENCY=1 SIZE=512 CONCURRENCY=128 make echo-perf
 
-sudo tc qdisc del dev lo root netem
+	LATENCY=1 SIZE=8192 CONCURRENCY=16 make echo-perf
+	LATENCY=1 SIZE=8192 CONCURRENCY=32 make echo-perf
+	LATENCY=1 SIZE=8192 CONCURRENCY=64 make echo-perf
+	LATENCY=1 SIZE=8192 CONCURRENCY=128 make echo-perf
 
-# 20ms RTT
-sudo tc qdisc add dev lo root netem delay 10ms
+	sudo tc qdisc del dev lo root netem
 
-LATENCY=20 SIZE=512 CONCURRENCY=1 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=2 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=4 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=8 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=16 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=32 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=64 make echo-perf
-LATENCY=20 SIZE=512 CONCURRENCY=128 make echo-perf
+	mv results.csv throughput-echo-${N}-1ms.csv
+done
 
-LATENCY=20 SIZE=1024 CONCURRENCY=1 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=2 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=4 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=8 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=16 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=32 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=64 make echo-perf
-LATENCY=20 SIZE=1024 CONCURRENCY=128 make echo-perf
+for N in 1 2 3 4 5
+do
+	sudo tc qdisc del dev lo root netem
 
-LATENCY=20 SIZE=8192 CONCURRENCY=1 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=2 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=4 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=8 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=16 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=32 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=64 make echo-perf
-LATENCY=20 SIZE=8192 CONCURRENCY=128 make echo-perf
+	# 20ms RTT
+	sudo tc qdisc add dev lo root netem delay 10ms
 
-sudo tc qdisc del dev lo root netem
+	LATENCY=20 SIZE=1 CONCURRENCY=16 make echo-perf
+	LATENCY=20 SIZE=1 CONCURRENCY=32 make echo-perf
+	LATENCY=20 SIZE=1 CONCURRENCY=64 make echo-perf
+	LATENCY=20 SIZE=1 CONCURRENCY=128 make echo-perf
+
+	LATENCY=20 SIZE=512 CONCURRENCY=16 make echo-perf
+	LATENCY=20 SIZE=512 CONCURRENCY=32 make echo-perf
+	LATENCY=20 SIZE=512 CONCURRENCY=64 make echo-perf
+	LATENCY=20 SIZE=512 CONCURRENCY=128 make echo-perf
+
+	LATENCY=20 SIZE=8192 CONCURRENCY=16 make echo-perf
+	LATENCY=20 SIZE=8192 CONCURRENCY=32 make echo-perf
+	LATENCY=20 SIZE=8192 CONCURRENCY=64 make echo-perf
+	LATENCY=20 SIZE=8192 CONCURRENCY=128 make echo-perf
+
+	sudo tc qdisc del dev lo root netem
+
+	mv results.csv throughput-echo-${N}-20ms.csv
+done
