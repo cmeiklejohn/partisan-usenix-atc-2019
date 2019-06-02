@@ -182,6 +182,15 @@ start(_Case, Config, Options) ->
             ct:pal("Setting parallelism to: ~p", [Parallelism]),
             ok = rpc:call(Node, partisan_config, set, [parallelism, Parallelism]),
 
+            VnodePartitioning = case ?config(vnode_partitioning, Config) of
+                              undefined ->
+                                  false;
+                              VP ->
+                                  VP
+                          end,
+            ct:pal("Setting vnode_partitioning to: ~p", [VnodePartitioning]),
+            ok = rpc:call(Node, partisan_config, set, [vnode_partitioning, VnodePartitioning]),
+
             Servers = proplists:get_value(servers, Options, []),
             Clients = proplists:get_value(clients, Options, []),
 
