@@ -11,7 +11,7 @@ port of Riak Core (from Basho) ported to Partisan for running experiments
 with a simulated key-value store using three vnodes, and a echo service using
 a single vnode.
 
-Our port of Riak Core is available [here](https://github.com/lasp-lang/riak_core) with a compatibility library available [here](https://github.com/lasp-lang/riak_core_partisan_utils).
+Our port of Riak Core is available [here](https://github.com/lasp-lang/riak_core/tree/partisan-support-r21) with a compatibility library available [here](https://github.com/lasp-lang/riak_core_partisan_utils).
 
 ## Data Collection Targets
 
